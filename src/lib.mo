@@ -29,7 +29,7 @@ module {
         accounts: Map.Map<Blob, AccountMem>;
     };
 
-    public func Mem() : Mem {
+    public func LMem() : Mem {
         {
             reader = IcrcReader.Mem();
             sender = IcrcSender.Mem();
@@ -42,8 +42,8 @@ module {
             a;
     };
 
-    public class Ledger({lmem: Mem; ledger_id: Principal}) {
-
+    public class Ledger(lmem: Mem, ledger_id_txt: Text) {
+        let ledger_id = Principal.fromText(ledger_id_txt);
         var actor_principal : ?Principal = null;
         var next_tx_id : Nat64 = 0;
         let errors = Vector.new<Text>();
@@ -105,7 +105,8 @@ module {
             };
         });
 
-        public func start(me: Principal) : () {
+        public func start(act: actor {}) : () {
+            let me = Principal.fromActor(act);
             actor_principal := ?me;
             icrc_sender.start(me); // We can't call start from the constructor because this is not defined yet
             icrc_reader.start();
