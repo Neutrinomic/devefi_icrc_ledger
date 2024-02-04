@@ -47,7 +47,7 @@ module {
         var actor_principal : ?Principal = null;
         var next_tx_id : Nat64 = 0;
         let errors = Vector.new<Text>();
-        var callback_onRecieve: ?((ICRCLedger.Transfer) -> ()) = null;
+        var callback_onReceive: ?((ICRCLedger.Transfer) -> ()) = null;
         // Sender 
 
         let icrc_sender = IcrcSender.Sender({
@@ -91,7 +91,7 @@ module {
                             };
                         };
 
-                        let ?cb = callback_onRecieve else continue txloop;
+                        let ?cb = callback_onReceive else continue txloop;
                         cb(tr);
                     };
 
@@ -138,8 +138,8 @@ module {
             acc.balance - acc.in_transit;
         };
 
-        public func onRecieve(fn:(ICRCLedger.Transfer) -> ()) : () {
-            callback_onRecieve := ?fn;
+        public func onReceive(fn:(ICRCLedger.Transfer) -> ()) : () {
+            callback_onReceive := ?fn;
         };
 
 
