@@ -112,11 +112,11 @@ module {
             icrc_reader.start();
         };
 
-        public func get_errors() : async [Text] {
+        public func get_errors() : [Text] {
             Vector.toArray(errors)
         };
 
-        public func de_bug() : async Text {
+        public func de_bug() : Text {
             debug_show({
                 last_indexed_tx = lmem.reader.last_indexed_tx;
                 actor_principal = actor_principal;
