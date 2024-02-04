@@ -1,0 +1,14 @@
+[package]
+name = "devefi-icrc-ledger"
+version = "1.0.0"
+description = "Local ICRC ledger syncing with remote ledger"
+repository = ""
+keywords = [ ]
+license = "MIT"
+
+[dependencies]
+vector = "0.2.0"
+map = "9.0.1"
+stableheapbtreemap = "1.5.0"
+devefi-icrc-sender = "1.0.4"
+devefi-icrc-reader = "1.0.2"
