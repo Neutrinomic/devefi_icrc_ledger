@@ -53,7 +53,11 @@ let ledger_args = {
   },
 };
 
+<<<<<<< HEAD
 let wasm = fs.readFileSync("./ledger_canister.wasm");
+=======
+let wasm = fs.readFileSync("./scripts/ledger/ledger_canister.wasm");
+>>>>>>> a343f2e53735ab1c4a21c67b28e93a035febc2e3
 
 await aa.install_code({
   arg: initArg(init, [ledger_args]),
@@ -61,5 +65,8 @@ await aa.install_code({
   mode: { reinstall: null },
   canister_id,
 });
+<<<<<<< HEAD
 
 console.log("DONE")
+=======
+>>>>>>> a343f2e53735ab1c4a21c67b28e93a035febc2e3

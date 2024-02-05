@@ -17,6 +17,8 @@ actor class() = this {
     let ledger = L.Ledger(lmem, "mxzaz-hqaaa-aaaar-qaada-cai");
     ledger.onReceive(func (t) = ignore ledger.send({ to = t.from; amount = t.amount; from_subaccount = t.to.subaccount; }));
     
+    // there is also onMint, onSent (from this canister), onBurn
+
     ledger.start();
     
     public func start() { 
