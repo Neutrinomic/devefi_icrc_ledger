@@ -1,6 +1,6 @@
 [package]
 name = "devefi-icrc-ledger"
-version = "1.1.1"
+version = "1.1.2"
 description = "Local ICRC ledger syncing with remote ledger"
 repository = "https://github.com/Neutrinomic/devefi_icrc_ledger"
 keywords = [ ]
@@ -9,7 +9,7 @@ license = "MIT"
 [dependencies]
 vector = "0.2.0"
 map = "9.0.1"
-devefi-icrc-sender = "1.0.6"
+devefi-icrc-sender = "1.0.7"
 devefi-icrc-reader = "1.0.5"
 swb = "1.1.1"
 
