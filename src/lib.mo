@@ -12,14 +12,17 @@ import ICRCLedger "./icrc_ledger";
 import Debug "mo:base/Debug";
 import SWB "mo:swb";
 import Array "mo:base/Array";
+import Iter "mo:base/Iter";
 
 module {
     type R<A,B> = Result.Result<A,B>;
 
+    /// No other errors are currently possible
     type SendError = {
         #InsuficientFunds;
     };
 
+    /// Local account memory
     type AccountMem = {
         var balance: Nat;
         var in_transit: Nat;
@@ -31,6 +34,7 @@ module {
         accounts: Map.Map<Blob, AccountMem>;
     };
 
+    /// Used to create new ledger memory (it's outside of the class to be able to place it in stable memory)
     public func LMem() : Mem {
         {
             reader = IcrcReader.Mem();
@@ -40,15 +44,45 @@ module {
     };
 
     private func subaccountToBlob(s: ?Blob) : Blob {
-        let ?a = s else return Blob.fromArray([]);
+        let ?a = s else return Blob.fromArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
         a;
     };
 
-    public class Ledger(lmem: Mem, ledger_id_txt: Text) {
+
+    /// Info about local ledger params returned by getInfo
+    public type Info = {
+        last_indexed_tx: Nat;
+        accounts: Nat;
+        pending: Nat;
+        actor_principal: ?Principal;
+        sender_instructions_cost : Nat64;
+        reader_instructions_cost : Nat64;
+        errors : Nat;
+    };
+
+
+    /// The ledger class
+    /// start_from_block should be in most cases #last (starts from the last block when first started)
+    /// if something went wrong and you need to reinstall the canister
+    /// or use the library with a canister that already has tokens inside it's subaccount balances
+    /// you can set start_from_block to a specific block number from which you want to start reading the ledger when reinstalled
+    /// you will have to remove all onRecieve, onSent, onMint, onBurn callbacks and set them again
+    /// (or they could try to make calls based on old transactions)
+    /// 
+    /// Example:
+    /// ```motoko
+    ///     stable let lmem = L.LMem();
+    ///     let ledger = L.Ledger(lmem, "bnz7o-iuaaa-aaaaa-qaaaa-cai", #last);
+    /// ```
+    public class Ledger(lmem: Mem, ledger_id_txt: Text, start_from_block : ({#id:Nat; #last})) {
+
         let ledger_id = Principal.fromText(ledger_id_txt);
         var actor_principal : ?Principal = null;
         var next_tx_id : Nat64 = 0;
         let errors = SWB.SlidingWindowBuffer<Text>();
+
+        var sender_instructions_cost : Nat64 = 0;
+        var reader_instructions_cost : Nat64 = 0;
 
         var callback_onReceive: ?((ICRCLedger.Transfer) -> ()) = null;
         var callback_onSent: ?((ICRCLedger.Transfer) -> ()) = null;
@@ -70,12 +104,11 @@ module {
             mem = lmem.sender;
             onError = logErr; // In case a cycle throws an error
             onConfirmations = func (confirmations: [Nat64]) {
-                // handle confirmed ids
+                // handle confirmed ids after sender - not needed for now
             };
-            onCycleEnd = func (instructions: Nat64) {}; // used to measure how much instructions it takes to send transactions in one cycle
+            onCycleEnd = func (i: Nat64) { sender_instructions_cost := i }; // used to measure how much instructions it takes to send transactions in one cycle
         });
         
-
         private func handle_incoming_amount(subaccount: ?Blob, amount: Nat) : () {
             switch(Map.get<Blob, AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount))) {
                 case (?acc) {
@@ -93,16 +126,29 @@ module {
         private func handle_outgoing_amount(subaccount: ?Blob, amount: Nat) : () {
             let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(subaccount)) else return;
             acc.balance -= amount:Nat;
-            acc.in_transit -= amount:Nat;
+
+            // When replaying the ledger we don't have in_transit and it results in natural substraction underflow.
+            // since in_transit is local and added when sending
+            // we have to ignore if it when replaying
+            // Also if for some reason devs decide to send funds with something else than this library, it will also be an amount that is not in transit
+            if (acc.in_transit < amount) {
+                acc.in_transit := 0;
+            } else {
+                acc.in_transit -= amount:Nat; 
+            };
+
+            if (acc.balance == 0 and acc.in_transit == 0) {
+                ignore Map.remove<Blob, AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount));
+            };
         };
 
         // Reader
         let icrc_reader = IcrcReader.Reader({
             mem = lmem.reader;
             ledger_id;
-            start_from_block = #last;
+            start_from_block;
             onError = logErr; // In case a cycle throws an error
-            onCycleEnd = func (instructions: Nat64) {}; // returns the instructions the cycle used. 
+            onCycleEnd = func (i: Nat64) { reader_instructions_cost := i }; // returns the instructions the cycle used. 
                                                         // It can include multiple calls to onRead
             onRead = func (transactions: [IcrcReader.Transaction]) {
                 icrc_sender.confirm(transactions);
@@ -110,47 +156,43 @@ module {
                 let fee = icrc_sender.getFee();
                 let ?me = actor_principal else return;
                 label txloop for (tx in transactions.vals()) {
-                    
                     if (not Option.isNull(tx.mint)) {
                         let ?mint = tx.mint else continue txloop;
                         if (mint.to.owner == me) {
                             handle_incoming_amount(mint.to.subaccount, mint.amount);
 
-                            let ?cb = callback_onMint else continue txloop;
-                            cb(mint);
+                            ignore do ? { callback_onMint!(mint); };
                         };
-                        
                     };
                     if (not Option.isNull(tx.transfer)) {
                         let ?tr = tx.transfer else continue txloop;
                     
                         if (tr.to.owner == me) {
-                            if (tr.amount < fee) continue txloop; // ignore it since we can't even burn that
-
+                            if (tr.amount >= fee) { // ignore it since we can't even burn that
                             handle_incoming_amount(tr.to.subaccount, tr.amount);
-
-                            let ?cb = callback_onReceive else continue txloop;
-                            cb(tr);
+                            ignore do ? { callback_onReceive!(tr); };
+                            }
                         };
 
                         if (tr.from.owner == me) {
                             handle_outgoing_amount(tr.from.subaccount, tr.amount + fee);
-                            let ?cb = callback_onSent else continue txloop;
-                            cb(tr);
+
+                            ignore do ? { callback_onSent!(tr); };
                         };
                     };
                     if (not Option.isNull(tx.burn)) {
                         let ?burn = tx.burn else continue txloop;
                         if (burn.from.owner == me) {
                             handle_outgoing_amount(burn.from.subaccount, burn.amount + fee);
-                            let ?cb = callback_onBurn else continue txloop;
-                            cb(burn);
+
+                            ignore do ? { callback_onBurn!(burn); };
                         };
                     };
                 };
             };
         });
 
+        /// Set the actor principal. If `start` has been called before, it will really start the ledger.
         public func setOwner(act: actor {}) : () {
             actor_principal := ?Principal.fromActor(act);
         };
@@ -164,10 +206,12 @@ module {
           }
         };
 
+        /// Start the ledger timers
         public func start() : () {
-          ignore Timer.setTimer(#seconds 0, delayed_start);
+            ignore Timer.setTimer(#seconds 0, delayed_start);
         };
  
+        /// Really starts the ledger and the whole system
         private func realStart() {
             let ?me = actor_principal else Debug.trap("no actor principal");
             Debug.print(debug_show(me));
@@ -177,6 +221,7 @@ module {
             icrc_reader.start();
         };
 
+        /// Returns the errors that happened
         public func getErrors() : [Text] {
             let start = errors.start();
             Array.tabulate<Text>(errors.len(), func (i:Nat) {
@@ -185,25 +230,45 @@ module {
             });
         };
     
-        public func de_bug() : Text {
-            debug_show({
+        /// Returns info about ledger library
+        public func getInfo() : Info {
+            {
                 last_indexed_tx = lmem.reader.last_indexed_tx;
-                actor_principal = actor_principal;
-            })
+                accounts = Map.size(lmem.accounts);
+                pending = icrc_sender.getPendingCount();
+                actor_principal;
+                sent = next_tx_id;
+                reader_instructions_cost;
+                sender_instructions_cost;
+                errors = errors.len();
+            }
         };
 
+        /// Get Iter of all accounts owned by the canister (except dust < fee)
+        public func accounts() : Iter.Iter<(Blob, Nat)> {
+            Iter.map<(Blob, AccountMem), (Blob, Nat)>(Map.entries<Blob, AccountMem>(lmem.accounts), func((k, v)) {
+                (k, v.balance - v.in_transit)
+            });
+        };
+
+        /// Returns the fee for sending a transaction
         public func getFee() : Nat {
             icrc_sender.getFee();
         };
 
+        /// Returns the ledger sender class
         public func getSender() : IcrcSender.Sender {
             icrc_sender;
         };
 
+        /// Returns the ledger reader class
         public func getReader() : IcrcReader.Reader {
             icrc_reader;
         };
 
+        /// Send a transfer from a canister owned address
+        /// It's added to a queue and will be sent as soon as possible.
+        /// You can send tens of thousands of transactions in one update call. It just adds them to a BTree
         public func send(tr: IcrcSender.TransactionInput) : R<Nat64, SendError> { // The amount we send includes the fee. meaning recepient will get the amount - fee
             let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(tr.from_subaccount)) else return #err(#InsuficientFunds);
             if (acc.balance:Nat - acc.in_transit:Nat < tr.amount) return #err(#InsuficientFunds);
@@ -214,25 +279,40 @@ module {
             #ok(id);
         };
 
+        /// Returns the balance of a subaccount owned by the canister (except dust < fee)
+        /// It's different from the balance in the original ledger if sent transactions are not confirmed yet.
+        /// We are keeping track of the in_transit amount.
         public func balance(subaccount:?Blob) : Nat {
             let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(subaccount)) else return 0;
             acc.balance - acc.in_transit;
         };
 
+        /// Called when a received transaction is confirmed. Only one function can be set. (except dust < fee)
         public func onReceive(fn:(ICRCLedger.Transfer) -> ()) : () {
+            assert(Option.isNull(callback_onReceive));
             callback_onReceive := ?fn;
         };
 
+        /// Called when a sent transaction is confirmed. Only one function can be set.
         public func onSent(fn:(ICRCLedger.Transfer) -> ()) : () {
+            assert(Option.isNull(callback_onSent));
             callback_onSent := ?fn;
         };
 
+        /// Called when a mint transaction is received. Only one function can be set.
+        /// In the rare cases when the ledger minter is sending your canister funds you need to handle this.
+        /// The event won't show in onRecieve
         public func onMint(fn:(ICRCLedger.Mint) -> ()) : () {
+            assert(Option.isNull(callback_onMint));
             callback_onMint := ?fn;
         };
 
+        /// Called when a burn transaction is received. Only one function can be set.
         public func onBurn(fn:(ICRCLedger.Burn) -> ()) : () {
+            assert(Option.isNull(callback_onBurn));
             callback_onBurn := ?fn;
         };
-    }
+    };
+
+
 }

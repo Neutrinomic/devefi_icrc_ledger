@@ -35,27 +35,29 @@ actor class() = this {
 
     var next_subaccount_id:Nat64 = 100000;
 
-    stable let lmem = L.LMem(); 
-    let ledger = L.Ledger(lmem, "bnz7o-iuaaa-aaaaa-qaaaa-cai");
+    stable let lmem = L.LMem();
+    let ledger = L.Ledger(lmem, "bnz7o-iuaaa-aaaaa-qaaaa-cai", #last);
     
     ledger.onMint(func (t) {
        // if sent mint transaction to this canister
        // we will split into 10,000 subaccounts
         var i = 0;
         label sending loop {
-            let amount = Int.abs(Float.toInt( Float.fromInt(t.amount) * 0.0001 )); // each acount gets 1/10000 of the amount
+            let amount = Int.abs(Float.toInt( Float.fromInt(t.amount) * 0.00005 )); // each acount gets 1/10000 of the amount
             ignore ledger.send({ to = {owner=test_owner; subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to.subaccount; });
             i += 1;
             if (i >= 10_000) break sending;
         }
     });
 
+    let dust = 10000; // leave dust to try the balance of function
+
     ledger.onReceive(func (t) {
         // if it has subaccount
         // we will pass it to another subaccount
         // until there is nothing to pass left the amount recieved is 0
-        if (t.amount < fee) return;
-        ignore ledger.send({ to = {owner=test_owner; subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount; from_subaccount = t.to.subaccount; });
+        if (t.amount < fee + dust) return;
+        ignore ledger.send({ to = {owner=test_owner; subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount - dust; from_subaccount = t.to.subaccount; });
         next_subaccount_id += 1;
     });
     
@@ -63,16 +65,24 @@ actor class() = this {
     //---
 
     public func start() {
-         Debug.print("started");
-         ledger.setOwner(this);
-         };
+        Debug.print("started");
+        ledger.setOwner(this);
+        };
+
+    public query func get_balance(s: ?Blob) : async Nat {
+        ledger.balance(s)
+        };
 
     public query func get_errors() : async [Text] {
         ledger.getErrors();
         };
 
-    public query func de_bug() : async Text {
-        ledger.de_bug();
+    public query func get_info() : async L.Info {
+        ledger.getInfo();
+        };
+
+    public query func accounts() : async [(Blob, Nat)] {
+        Iter.toArray(ledger.accounts());
         };
 
     public query func getPending() : async Nat {
