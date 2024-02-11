@@ -1,5 +1,5 @@
-import IcrcReader "mo:devefi-icrc-reader";
-import IcrcSender "mo:devefi-icrc-sender";
+import IcrcReader "./reader";
+import IcrcSender "./sender";
 import Principal "mo:base/Principal";
 import Timer "mo:base/Timer";
 import Nat64 "mo:base/Nat64";
@@ -191,6 +191,8 @@ module {
                 };
             };
         });
+
+        icrc_sender.setGetReaderLastTxTime(icrc_reader.getReaderLastTxTime);
 
         /// Set the actor principal. If `start` has been called before, it will really start the ledger.
         public func setOwner(act: actor {}) : () {

@@ -14,7 +14,7 @@ This statement serves as a foundational guide for understanding the operational 
 
 2) Persistently, the system endeavors to register the transaction within the ledger. Despite any initial failures, the mechanism is designed to attempt indefinitely until successful registration is achieved.
 
-3) It is important to note that the module cannot ensure the transmission of the precise amount initially intended due to potential variations in ledger fees during the transaction process. In the rare event of such fluctuations, the adjusted fee will be deducted from the transaction amount.
+3) It is important to note that the module cannot ensure the transmission of the precise amount initially intended due to potential variations in ledger fees during the transaction process. In the rare event of such fluctuations, the adjusted fee will be deducted from the transaction amount. The fee gets refreshed every 600 cycles (every ~20min).
 
 4) Furthermore, while the module efficiently processes transactions, it does not assure the preservation of their original sequential order.
 
@@ -31,11 +31,30 @@ This statement serves as a foundational guide for understanding the operational 
 
 13) Following the provided installation guidelines ensures the system's resilience through canister upgrades, restarts, or stops, maintaining both its queue and balances intact. This robustness extends to scenarios where the ledger itself may cease operations or undergo upgrades, safeguarding against inaccuracies in local balances or issues with the transaction queue.
 
+14) The system will try to resend the transaction multiple times during the first `transactionWindowNanos` (Fixed currently at 24hours). There is a very small chance that under heavy load the ledger won't register it. The system will adjust created_at to fit to the new window `retryWindow` equal to `2x(transactionWindowNanos + permittedDriftNanos)`, but only if the reader is following transaction history and not too far behind `allowedLagToChangeWindow` (15 minutes). With the current settings, this means if transaction fails to register within the first 24 hours, it will be retried every 48hours for 24 hours (between 48h - 75h, 96h - 120h,.. until the end of times or until transaction amount is <= fee)
 
+### Test - 1 - Dynamic Ledger Endurance Analysis
 
+#### Methodology
+We executed tests on a locally deployed ledger canister, specifically the latest one from the SNSW. The testing process involved receiving a large volume of tokens and dividing these by sending 10,000 transactions to various accounts. These recipient accounts then forwarded the transactions to other accounts until the transaction amount fell below the transaction fee. This strategy allowed us to initiate with sufficient tokens for 20,000 transactions and assess the total number of transactions successfully processed at the end of the test.
 
+Throughout the testing phase, we frequently stopped and restarted both the test canister equipped with this library and the ledger itself. Additionally, we performed several upgrades to the test canister during the testing period. Despite these interruptions, our trials consistently showed that no transactions were lost, whether in the sending or receiving phases.
 
-Note: TXWINDOW features and fee to be implemented asap, but not there yet.
+We further tested the system's resilience by intentionally causing the replica to generate errors during the sending process. These induced errors did not disrupt the queue's functionality.
+
+#### Important Notice
+This testing was conducted exclusively with Dfinity's icrc ledger, excluding the ICP ledger due to its distinct transaction log structure. It is important to note that the performance and reliability observed may not directly translate to other ledgers. The functionality of this library is contingent upon two key features: deduplication and the get_transactions method, which are slated for replacement with the upcoming ICRC-3 protocol. For optimal performance, both features must operate flawlessly.
+
+#### Throughput Per Ledger
+Sending to Library Queue: Limited only by canister memory and instruction limits.
+Sending from Queue to Ledger: ~45 tx/s (could be double if both canisters are on the same subnet or tested in local replica)
+Reading from Ledger: ~250 tx/s
+
+### Test - 2 - Integrity Verification Protocol
+
+#### Methodology
+
+Execute 20,000 transactions (the ledger is configured to split the archive after every 10,000 transactions). Obtain a hash from all account balances owned by the canister. Reinstall the canister and start from block 0 (removing hooks). Generate a second hash and compare it to the first; the two hashes should match. Additionally, retrieve all accounts using the new accounts function and directly check their balances by calling the ledger. Compare both sets of balances to ensure they match. The library has passed this test multiple times.
 
 
 ## Usage
