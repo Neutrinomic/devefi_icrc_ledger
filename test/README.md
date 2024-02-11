@@ -13,6 +13,7 @@ dfx start --clean
 
 ```
 cd test/ledger
+rm canisters.json // if starting for the first time after dfx start --clean
 yarn install
 node deploy.js
 ```
@@ -28,3 +29,5 @@ dfx deploy
 ```
 node send.js
 ```
+
+6) Use maker/user.blast to try different scenarios

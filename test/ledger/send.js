@@ -21,7 +21,7 @@ let ledger = await local(canister_id);
 let balance = await ledger.icrc1_balance_of({owner:me})
 console.log(`Balance: ${balance}`)
 
-let to_canister = "be2us-64aaa-aaaaa-qaabq-cai"; // The canister in dfx.json
+let to_canister = "bd3sg-teaaa-aaaaa-qaaba-cai"; // The canister in dfx.json
 let testers = 10000;
 let fee = 10000;
 let tx_per_each = 6; // 10 transactions per each tester

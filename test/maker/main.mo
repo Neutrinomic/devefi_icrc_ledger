@@ -11,8 +11,6 @@ import Debug "mo:base/Debug";
 
 actor class() = this {
 
-    let v = 5; // used to force upgrade without changing code
-    let test_owner = Principal.fromText("be2us-64aaa-aaaaa-qaabq-cai"); // this canister
 
     private func test_subaccount(n:Nat64) : ?Blob {
         ?Blob.fromArray(Iter.toArray(I.pad<Nat8>( Iter.fromArray(ENat64(n)), 32, 0 : Nat8)));
@@ -44,7 +42,7 @@ actor class() = this {
         var i = 0;
         label sending loop {
             let amount = Int.abs(Float.toInt( Float.fromInt(t.amount) * 0.00005 )); // each acount gets 1/10000 of the amount
-            ignore ledger.send({ to = {owner=test_owner; subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to.subaccount; });
+            ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to.subaccount; });
             i += 1;
             if (i >= 10_000) break sending;
         }
@@ -57,7 +55,7 @@ actor class() = this {
         // we will pass it to another subaccount
         // until there is nothing to pass left the amount recieved is 0
         if (t.amount < fee + dust) return;
-        ignore ledger.send({ to = {owner=test_owner; subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount - dust; from_subaccount = t.to.subaccount; });
+        ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount - dust; from_subaccount = t.to.subaccount; });
         next_subaccount_id += 1;
     });
     
@@ -88,5 +86,9 @@ actor class() = this {
     public query func getPending() : async Nat {
         ledger.getSender().getPendingCount();
         };
+    
+     public query func ver() : async Nat {
+        4
+     }
     
 }

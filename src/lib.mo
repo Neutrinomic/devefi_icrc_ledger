@@ -32,6 +32,7 @@ module {
         reader: IcrcReader.Mem;
         sender: IcrcSender.Mem;
         accounts: Map.Map<Blob, AccountMem>;
+        var actor_principal : ?Principal;
     };
 
     /// Used to create new ledger memory (it's outside of the class to be able to place it in stable memory)
@@ -40,6 +41,7 @@ module {
             reader = IcrcReader.Mem();
             sender = IcrcSender.Mem();
             accounts = Map.new<Blob, AccountMem>();
+            var actor_principal = null;
         }
     };
 
@@ -58,6 +60,7 @@ module {
         sender_instructions_cost : Nat64;
         reader_instructions_cost : Nat64;
         errors : Nat;
+        lastTxTime: Nat64;
     };
 
 
@@ -77,7 +80,6 @@ module {
     public class Ledger(lmem: Mem, ledger_id_txt: Text, start_from_block : ({#id:Nat; #last})) {
 
         let ledger_id = Principal.fromText(ledger_id_txt);
-        var actor_principal : ?Principal = null;
         var next_tx_id : Nat64 = 0;
         let errors = SWB.SlidingWindowBuffer<Text>();
 
@@ -154,7 +156,7 @@ module {
                 icrc_sender.confirm(transactions);
                 
                 let fee = icrc_sender.getFee();
-                let ?me = actor_principal else return;
+                let ?me = lmem.actor_principal else return;
                 label txloop for (tx in transactions.vals()) {
                     if (not Option.isNull(tx.mint)) {
                         let ?mint = tx.mint else continue txloop;
@@ -196,12 +198,12 @@ module {
 
         /// Set the actor principal. If `start` has been called before, it will really start the ledger.
         public func setOwner(act: actor {}) : () {
-            actor_principal := ?Principal.fromActor(act);
+            lmem.actor_principal := ?Principal.fromActor(act);
         };
 
         // will loop until the actor_principal is set
         private func delayed_start() : async () {
-          if (not Option.isNull(actor_principal)) {
+          if (not Option.isNull(lmem.actor_principal)) {
             realStart();
           } else {
             ignore Timer.setTimer(#seconds 3, delayed_start);
@@ -215,12 +217,19 @@ module {
  
         /// Really starts the ledger and the whole system
         private func realStart() {
-            let ?me = actor_principal else Debug.trap("no actor principal");
+            let ?me = lmem.actor_principal else Debug.trap("no actor principal");
             Debug.print(debug_show(me));
             if (started) Debug.trap("already started");
             started := true;
             icrc_sender.start(?me); // We can't call start from the constructor because this is not defined yet
             icrc_reader.start();
+        };
+
+
+        /// Returns the actor principal
+        public func me() : Principal {
+            let ?me = lmem.actor_principal else Debug.trap("no actor principal");
+            me;
         };
 
         /// Returns the errors that happened
@@ -238,11 +247,12 @@ module {
                 last_indexed_tx = lmem.reader.last_indexed_tx;
                 accounts = Map.size(lmem.accounts);
                 pending = icrc_sender.getPendingCount();
-                actor_principal;
+                actor_principal = lmem.actor_principal;
                 sent = next_tx_id;
                 reader_instructions_cost;
                 sender_instructions_cost;
                 errors = errors.len();
+                lastTxTime = icrc_reader.getReaderLastTxTime();
             }
         };
 
