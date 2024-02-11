@@ -108,7 +108,7 @@ module {
             var sent_count = 0;
             label vtransactions for ((id, tx) in transactions_to_send.results.vals()) {
                 
-                if (tx.amount <= fee) {
+                if (tx.amount < fee) {
                     ignore BTree.delete<Nat64, Transaction>(mem.transactions, Nat64.compare, id);
                     continue vtransactions;
                 };
