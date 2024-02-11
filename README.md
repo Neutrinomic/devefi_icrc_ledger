@@ -51,7 +51,7 @@ Following the provided installation guidelines ensures the system's resilience t
 The system will try to resend the transaction multiple times during the first `transactionWindowNanos` (Fixed currently at 24hours). There is a very small chance that under heavy load the ledger won't register it. The system will adjust created_at to fit to the new window `retryWindow` equal to `2x(transactionWindowNanos + permittedDriftNanos)`, but only if the reader is following transaction history and not too far behind `allowedLagToChangeWindow` (15 minutes). With the current settings, this means if transaction fails to register within the first 24 hours, it will be retried every 48hours for 24 hours (between 48h - 75h, 96h - 120h,.. until the end of times or until transaction amount is < fee)
 
 #### 15. Error Handling and Infinite Loop Prevention in Transaction Processing
-Hooks must not trap because Motoko is unable to catch synchronous errors. In the event of an error, any state changes will be reverted, and the system will enter an infinite loop, repeatedly processing the same transactions until an upgrade rectifies the issue. Additionally, developers should avoid using Timers within synchronous hooks, as this can disrupt the rollback mechanism.
+Hooks must not trap because Motoko is unable to catch synchronous errors. In the event of an error, any state changes will be reverted, and the system will enter an infinite loop, repeatedly processing the same transactions until an upgrade rectifies the issue. Additionally, developers should avoid setting Timers within synchronous hooks, as this can disrupt the rollback mechanism.
 
 #### 16. Balance Management and Transaction Dispatch Mechanism
 When a transaction is enqueued, its amount is deducted from the balance. This process involves maintaining two figures: balance, which represents the actual balance, and in_transit, which tracks the amount being dispatched through outgoing transactions. This mechanism prevents the system from initiating multiple transactions without sufficient balance.
@@ -90,20 +90,23 @@ import Principal "mo:base/Principal";
 
 actor class() = this {
 
-    stable let lmem = L.LMem(); 
+    stable let lmem = L.LMem(); // has to be stable
+    
     let ledger = L.Ledger(lmem, "mxzaz-hqaaa-aaaar-qaada-cai", #last);
+
     ledger.onReceive(func (t) = ignore ledger.send({ to = t.from; amount = t.amount; from_subaccount = t.to.subaccount; }));
     
     // there are also onMint, onSent (from this canister), onBurn
 
     ledger.start();
     
-    public func start() { 
-         ledger.setOwner(this);
+    public shared({caller}) func start() { 
+         assert(Principal.isController(caller));
+         ledger.setOwner(this); // required to be called once when canister is installed
          };
 
     public query func getErrors() : async [Text] { 
-        ledger.getErrors();
+        ledger.getErrors(); // When running timers, if there is an error it will show here and nowhere else. (Hooks are called by timers too)
     };
 
     public query func getInfo() : async L.Info {
