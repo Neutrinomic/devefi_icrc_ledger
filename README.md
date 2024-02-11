@@ -1,4 +1,6 @@
-# devefi-icrc-ledger
+# DeVeFi Ledger Middleware
+
+The DeVeFi Ledger Middleware enhances the Internet Computer by introducing internal atomicity for DeFi applications, designating canisters as the sole authorities over their controlled tokens. This approach directly tackles the challenges posed by asynchronous communication, ensuring transactions within the canister achieve internal atomicity before syncing with the master ledger. 
 
 ## Install
 ```
