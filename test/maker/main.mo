@@ -87,11 +87,11 @@ actor class() = this {
         ledger.getSender().getPendingCount();
         };
     
-     public query func ver() : async Nat {
+    public query func ver() : async Nat {
         4
         };
     
-    public query func getMeta() : async ?L.Meta {
+    public query func getMeta() : async L.Meta {
         ledger.getMeta()
         };
 }
