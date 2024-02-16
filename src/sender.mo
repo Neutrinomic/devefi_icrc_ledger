@@ -70,7 +70,7 @@ module {
         ledger_id: Principal;
         onError: (Text) -> ();
         onConfirmations : ([Nat64]) -> ();
-        
+        getMinter : () -> (?Ledger.Account);
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
     }) {
         var started = false;
@@ -78,11 +78,17 @@ module {
         let ledger_cb = actor(Principal.toText(ledger_id)) : Ledger.Self;
         var getReaderLastTxTime : ?(() -> (Nat64)) = null;
         var stored_fee:?Nat = null;
-        
+
         var cycle_idx = 0;
 
         public func setGetReaderLastTxTime(fn : () -> (Nat64)) {
             getReaderLastTxTime := ?fn;
+        };
+
+        private func retrieveFee() : async () {
+            try {
+            stored_fee := ?(await ledger_cb.icrc1_fee());
+            } catch (e) {}
         };
 
         private func cycle() : async () {
@@ -92,9 +98,13 @@ module {
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
             if (Option.isNull(stored_fee) or (cycle_idx % 600 == 0)) { // We could also use last observed by reader fee, but I am not sure that's part of the spec (perhaps someone is allowed to pay higher than the minimum fee)
-                stored_fee := ?(await ledger_cb.icrc1_fee());
+                await retrieveFee();
                 };
-            let ?fee = stored_fee else Debug.trap("Fee not available");
+
+            let ?fee = stored_fee else do {
+                ignore Timer.setTimer(#seconds 2, cycle);
+                return;
+            };
 
             let now = Int.abs(Time.now());
             let nowU64 = Nat64.fromNat(now);
@@ -146,17 +156,39 @@ module {
             onCycleEnd(inst_end - inst_start);
         };
 
-
+        private func getTxMemoFrom(tx: Ledger.Transaction) : ?(Ledger.Account, Blob) {
+            if (tx.kind == "mint") {
+                let ?mint = tx.mint else return null;
+                let ?memo = mint.memo else return null;
+                let ?minter = getMinter() else return null;
+                return ?(minter, memo);
+            };
+            if (tx.kind == "transfer") {
+                let ?tr = tx.transfer else return null;
+                let ?memo = tr.memo else return null;
+                return ?(tr.from, memo);
+            };
+            if (tx.kind == "burn") {
+                let ?burn = tx.burn else return null;
+                let ?memo = burn.memo else return null;
+                return ?(burn.from, memo);
+            };
+            null;
+        };
 
         public func confirm(txs: [Ledger.Transaction]) {
+            // If our canister sends to a burn address it will be a burn tx.
+            // If our canister is the minter address, tx will appear as mint
+            // otherwise they will be transfer txs
+            // All need to be confirmed
             let ?owner = mem.stored_owner else return;
 
             let confirmations = Vector.new<Nat64>();
-            label tloop for (tx in txs.vals()) {
-                let ?tr = tx.transfer else continue tloop;
-                if (tr.from.owner != owner) continue tloop;
-                let ?memo = tr.memo else continue tloop;
-                let ?id = DNat64(Blob.toArray(memo)) else continue tloop;
+            label tloop for (tx in txs.vals()) { 
+                
+                let ?(tx_from, tx_memo) = getTxMemoFrom(tx) else continue tloop;
+                if (tx_from.owner != owner) continue tloop;
+                let ?id = DNat64(Blob.toArray(tx_memo)) else continue tloop;
                 
                 ignore BTree.delete<Nat64, Transaction>(mem.transactions, Nat64.compare, id);
                 Vector.add<Nat64>(confirmations, id);
@@ -164,9 +196,8 @@ module {
             onConfirmations(Vector.toArray(confirmations));
         };
 
-        public func getFee() : Nat {
-            let ?fee = stored_fee else Debug.trap("Fee not available");
-            return fee;
+        public func getFee() : ?Nat {
+            stored_fee;
         };
 
         public func getPendingCount() : Nat {

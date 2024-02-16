@@ -58,6 +58,7 @@ Hooks must not trap because Motoko is unable to catch synchronous errors. In the
 #### 16. Balance Management and Transaction Dispatch Mechanism
 When a transaction is enqueued, its amount is deducted from the balance. This process involves maintaining two figures: balance, which represents the actual balance, and in_transit, which tracks the amount being dispatched through outgoing transactions. This mechanism prevents the system from initiating multiple transactions without sufficient balance.
 
+
 ### Test - 1 - Dynamic Ledger Endurance Analysis
 
 #### Methodology

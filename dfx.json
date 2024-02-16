@@ -10,5 +10,5 @@
       "packtool": "mops sources"
     }
   },
-  "dfx": "0.15.2"
+  "dfx": "0.16.0"
 }

@@ -89,6 +89,9 @@ actor class() = this {
     
      public query func ver() : async Nat {
         4
-     }
+        };
     
+    public query func getMeta() : async ?L.Meta {
+        ledger.getMeta()
+        };
 }

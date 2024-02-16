@@ -33,6 +33,7 @@ module {
         sender: IcrcSender.Mem;
         accounts: Map.Map<Blob, AccountMem>;
         var actor_principal : ?Principal;
+        var meta : ?StoredMeta;
     };
 
     /// Used to create new ledger memory (it's outside of the class to be able to place it in stable memory)
@@ -42,6 +43,8 @@ module {
             sender = IcrcSender.Mem();
             accounts = Map.new<Blob, AccountMem>();
             var actor_principal = null;
+            var meta = null;
+            minter = null;
         }
     };
 
@@ -63,6 +66,15 @@ module {
         lastTxTime: Nat64;
     };
 
+    type StoredMeta = {
+        symbol: Text;
+        decimals: Nat8;
+        minter: ?ICRCLedger.Account;
+    };
+
+    public type Meta = StoredMeta and {
+        fee: Nat;
+    };
 
     /// The ledger class
     /// start_from_block should be in most cases #last (starts from the last block when first started)
@@ -101,6 +113,11 @@ module {
             };
         };
 
+        public func getMinter() : (?ICRCLedger.Account) {
+            let ?m = lmem.meta else return null;
+            m.minter;
+        };
+
         let icrc_sender = IcrcSender.Sender({
             ledger_id;
             mem = lmem.sender;
@@ -108,9 +125,16 @@ module {
             onConfirmations = func (confirmations: [Nat64]) {
                 // handle confirmed ids after sender - not needed for now
             };
+            getMinter = getMinter;
             onCycleEnd = func (i: Nat64) { sender_instructions_cost := i }; // used to measure how much instructions it takes to send transactions in one cycle
         });
         
+        public func getMeta() : ?Meta {
+            let ?m = lmem.meta else return null;
+            let ?fee = icrc_sender.getFee() else return null;
+            ?{m with fee};
+        };
+
         private func handle_incoming_amount(subaccount: ?Blob, amount: Nat) : () {
             switch(Map.get<Blob, AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount))) {
                 case (?acc) {
@@ -155,7 +179,7 @@ module {
             onRead = func (transactions: [IcrcReader.Transaction]) {
                 icrc_sender.confirm(transactions);
                 
-                let fee = icrc_sender.getFee();
+                let ?fee = icrc_sender.getFee() else return; // Not ready yet;
                 let ?me = lmem.actor_principal else return;
                 label txloop for (tx in transactions.vals()) {
                     if (not Option.isNull(tx.mint)) {
@@ -203,7 +227,9 @@ module {
 
         // will loop until the actor_principal is set
         private func delayed_start() : async () {
-          if (not Option.isNull(lmem.actor_principal)) {
+          if (Option.isNull(lmem.meta)) await retrieveMeta();
+
+          if (not Option.isNull(lmem.actor_principal) and not Option.isNull(lmem.meta)) {
             realStart();
           } else {
             ignore Timer.setTimer(#seconds 3, delayed_start);
@@ -214,7 +240,17 @@ module {
         public func start() : () {
             ignore Timer.setTimer(#seconds 0, delayed_start);
         };
- 
+
+        private func retrieveMeta() : async () {
+            try {
+            let ledger = actor (Principal.toText(ledger_id)) : ICRCLedger.Self;
+            let symbol = await ledger.icrc1_symbol();
+            let decimals = await ledger.icrc1_decimals();
+            let minter = await ledger.icrc1_minting_account();
+            lmem.meta := ?{symbol; decimals; minter};
+            } catch (e) {} // if not cought it will stop the recurring timer
+        };
+
         /// Really starts the ledger and the whole system
         private func realStart() {
             let ?me = lmem.actor_principal else Debug.trap("no actor principal");
@@ -264,7 +300,7 @@ module {
         };
 
         /// Returns the fee for sending a transaction
-        public func getFee() : Nat {
+        public func getFee() : ?Nat {
             icrc_sender.getFee();
         };
 
@@ -324,6 +360,12 @@ module {
             assert(Option.isNull(callback_onBurn));
             callback_onBurn := ?fn;
         };
+
+
+
+
+
+
     };
 
 
