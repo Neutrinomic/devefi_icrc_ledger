@@ -18,17 +18,17 @@ module {
     type R<A,B> = Result.Result<A,B>;
 
     /// No other errors are currently possible
-    type SendError = {
+    public type SendError = {
         #InsuficientFunds;
     };
 
     /// Local account memory
-    type AccountMem = {
+    public type AccountMem = {
         var balance: Nat;
         var in_transit: Nat;
     };
 
-    type Mem = {
+    public type Mem = {
         reader: IcrcReader.Mem;
         sender: IcrcSender.Mem;
         accounts: Map.Map<Blob, AccountMem>;
@@ -351,6 +351,12 @@ module {
         public func balance(subaccount:?Blob) : Nat {
             let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(subaccount)) else return 0;
             acc.balance - acc.in_transit;
+        };
+
+        /// Returns the internal balance in case we want to see in_transit and raw balance separately
+        public func balanceInternal(subaccount:?Blob) : (Nat, Nat) {
+            let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(subaccount)) else return (0,0);
+            (acc.balance, acc.in_transit)
         };
 
         /// Called when a received transaction is confirmed. Only one function can be set. (except dust < fee)
