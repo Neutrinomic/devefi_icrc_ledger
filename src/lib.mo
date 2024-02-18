@@ -100,6 +100,8 @@ module {
         var callback_onSent: ?((ICRCLedger.Transfer) -> ()) = null;
         var callback_onMint: ?((ICRCLedger.Mint) -> ()) = null;
         var callback_onBurn: ?((ICRCLedger.Burn) -> ()) = null;
+        var callback_onBalanceChange : ?((?Blob, Nat, Nat) -> ()) = null;
+
         // Sender 
 
         var started : Bool = false;
@@ -140,12 +142,14 @@ module {
             switch(Map.get<Blob, AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount))) {
                 case (?acc) {
                     acc.balance += amount:Nat;
+                    ignore do ? { callback_onBalanceChange!(subaccount, acc.balance, acc.in_transit); }
                 };
                 case (null) {
                     Map.set(lmem.accounts, Map.bhash, subaccountToBlob(subaccount), {
                         var balance = amount;
                         var in_transit = 0;
                     });
+                    ignore do ? { callback_onBalanceChange!(subaccount, amount, 0); }
                 };
             };
         };
@@ -167,6 +171,8 @@ module {
             if (acc.balance == 0 and acc.in_transit == 0) {
                 ignore Map.remove<Blob, AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount));
             };
+
+            ignore do ? { callback_onBalanceChange!(subaccount, acc.balance, acc.in_transit); }
         };
 
         // Reader
@@ -377,6 +383,13 @@ module {
         public func onMint(fn:(ICRCLedger.Mint) -> ()) : () {
             assert(Option.isNull(callback_onMint));
             callback_onMint := ?fn;
+        };
+
+        /// Called when there is a change in the balance or in_transit of a subaccount. Only one function can be set.
+        /// callback input: Subaccount, balance, in_transit
+        public func onBalanceChange(fn:(?Blob, Nat, Nat) -> ()) : () {
+            assert(Option.isNull(callback_onBalanceChange));
+            callback_onBalanceChange := ?fn;
         };
 
         /// Called when a burn transaction is received. Only one function can be set.
