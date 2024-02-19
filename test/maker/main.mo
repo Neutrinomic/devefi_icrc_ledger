@@ -9,7 +9,7 @@ import Nat8 "mo:base/Nat8";
 import Nat64 "mo:base/Nat64";
 import Debug "mo:base/Debug";
 
-actor class() = this {
+actor class({ledgerId: Principal}) = this {
 
 
     private func test_subaccount(n:Nat64) : ?Blob {
@@ -29,22 +29,21 @@ actor class() = this {
         ];
     };
 
-    let fee = 10_000; //TODO: Put getFee func inside library
 
     var next_subaccount_id:Nat64 = 100000;
 
     stable let lmem = L.LMem();
-    let ledger = L.Ledger(lmem, "bnz7o-iuaaa-aaaaa-qaaaa-cai", #last);
+    let ledger = L.Ledger(lmem, Principal.toText(ledgerId), #last);
     
     ledger.onMint(func (t) {
        // if sent mint transaction to this canister
-       // we will split into 10,000 subaccounts
+       // we will split into 1,000 subaccounts
         var i = 0;
         label sending loop {
-            let amount = Int.abs(Float.toInt( Float.fromInt(t.amount) * 0.00005 )); // each acount gets 1/10000 of the amount
+            let amount = t.amount / 10000; // Each account gets 1/10000
             ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to.subaccount; });
             i += 1;
-            if (i >= 10_000) break sending;
+            if (i >= 1_000) break sending;
         }
     });
 
@@ -52,10 +51,9 @@ actor class() = this {
 
     ledger.onReceive(func (t) {
         // if it has subaccount
-        // we will pass it to another subaccount
-        // until there is nothing to pass left the amount recieved is 0
-        if (t.amount < fee + dust) return;
-        ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount - dust; from_subaccount = t.to.subaccount; });
+        // we will pass half to another subaccount
+        if (t.amount/10 < ledger.getFee() ) return; // if we send that it will be removed from our balance but won't register
+        ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount / 10 ; from_subaccount = t.to.subaccount; });
         next_subaccount_id += 1;
     });
     
