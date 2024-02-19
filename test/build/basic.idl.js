@@ -19,7 +19,7 @@ export const idlFactory = ({ IDL }) => {
     'reader_instructions_cost' : IDL.Nat64,
     'sender_instructions_cost' : IDL.Nat64,
   });
-  const anon_class_12_1 = IDL.Service({
+  const anon_class_13_1 = IDL.Service({
     'accounts' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
@@ -37,7 +37,7 @@ export const idlFactory = ({ IDL }) => {
     'start' : IDL.Func([], [], ['oneway']),
     'ver' : IDL.Func([], [IDL.Nat], ['query']),
   });
-  return anon_class_12_1;
+  return anon_class_13_1;
 };
 export const init = ({ IDL }) => {
   return [IDL.Record({ 'ledgerId' : IDL.Principal })];

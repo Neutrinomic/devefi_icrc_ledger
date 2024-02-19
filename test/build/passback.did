@@ -1,4 +1,4 @@
-type anon_class_12_1 = 
+type anon_class_13_1 = 
  service {
    accounts: () -> (vec record {
                           blob;
@@ -35,4 +35,4 @@ type Account =
    owner: principal;
    subaccount: opt blob;
  };
-service : (record {ledgerId: principal;}) -> anon_class_12_1
+service : (record {ledgerId: principal;}) -> anon_class_13_1

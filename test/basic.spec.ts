@@ -1,9 +1,27 @@
 import { Principal } from '@dfinity/principal';
+import { resolve } from 'node:path';
 import { Actor, PocketIc, createIdentity } from '@hadronous/pic';
-// import { IDL } from '@dfinity/candid';
-import {TestService, TestCan} from "./userCanister";
+import { IDL } from '@dfinity/candid';
+import { _SERVICE as TestService, idlFactory as TestIdlFactory, init } from './build/basic.idl.js';
 
-import {ICRCLedgerService, ICRCLedger} from "../icrc_ledger/ledgerCanister";
+import {ICRCLedgerService, ICRCLedger} from "./icrc_ledger/ledgerCanister";
+//@ts-ignore
+import {toState} from "@infu/icblast";
+// Jest can't handle multi threaded BigInts o.O That's why we use toState
+
+const WASM_PATH = resolve(__dirname, "./build/basic.wasm");
+
+export async function TestCan(pic:PocketIc, ledgerCanisterId:Principal) {
+    
+    const fixture = await pic.setupCanister<TestService>({
+        idlFactory: TestIdlFactory,
+        wasm: WASM_PATH,
+        arg: IDL.encode(init({ IDL }), [{ledgerId: ledgerCanisterId}]),
+    });
+
+    return fixture;
+};
+
 
 describe('Counter', () => {
     let pic: PocketIc;
@@ -39,7 +57,7 @@ describe('Counter', () => {
   
     it(`Check (minter) balance`  , async () => {
       const result = await ledger.icrc1_balance_of({owner: jo.getPrincipal(), subaccount: []});
-      expect(result).toBe(100000000000n)
+      expect(toState(result)).toBe("100000000000")
     });
 
     it(`Send 1 to Bob`, async () => {
@@ -52,23 +70,23 @@ describe('Counter', () => {
         memo: [],
         created_at_time: [],
       });
-      expect(result).toStrictEqual({Ok:1n});
+      expect(toState(result)).toStrictEqual({Ok:"1"});
     });
 
     it(`Check Bob balance`  , async () => {
       const result = await ledger.icrc1_balance_of({owner: bob.getPrincipal(), subaccount: []});
-      expect(result).toBe(1_0000_0000n)
+      expect(toState(result)).toBe("100000000")
     });
 
     it(`last_indexed_tx should start at 0`, async () => {
       const result = await user.get_info();
-      expect(result.last_indexed_tx).toBe(0n);
+      expect(toState(result.last_indexed_tx)).toBe("0");
     });
 
     it(`Check ledger transaction log`  , async () => {
       const result = await ledger.get_transactions({start: 0n, length: 100n});
       expect(result.transactions.length).toBe(2);
-      expect(result.log_length).toBe(2n);
+      expect(toState(result.log_length)).toBe("2");
       
     });
 
@@ -80,7 +98,7 @@ describe('Counter', () => {
 
       await passTime(3);
       const result2 = await user.get_info();
-      expect(result2.last_indexed_tx).toBe(2n);
+      expect(toState(result2.last_indexed_tx)).toBe("2");
       
     });
 
@@ -99,7 +117,7 @@ describe('Counter', () => {
 
       const result2 = await user.get_info();
 
-      expect(result2.last_indexed_tx).toBe(6003n);
+      expect(toState(result2.last_indexed_tx)).toBe("6003");
       
     }, 600*1000);
 
@@ -111,15 +129,14 @@ describe('Counter', () => {
         idx++;
         if (idx % 50 != 0) continue; // check only every 50th account (to improve speed, snapshot should be enough when trying to cover all)
         let ledger_balance = await ledger.icrc1_balance_of({owner: userCanisterId, subaccount:[subaccount]});
-        expect(balance).toBe(ledger_balance);
+        expect(toState(balance)).toBe(toState(ledger_balance));
       } 
     }, 190*1000);
 
 
     it('Compare user balances to snapshot', async () => {
       let accounts = await user.accounts();
-      let text_accounts = accounts.map(([subaccount, balance] : [Uint8Array | number[], BigInt]) => [Buffer.from(subaccount).toString('hex'), balance]);
-      expect(text_accounts).toMatchSnapshot()
+      expect(toState(accounts)).toMatchSnapshot()
     });
 
     

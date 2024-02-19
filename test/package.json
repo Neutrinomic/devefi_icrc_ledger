@@ -12,8 +12,12 @@
     "@dfinity/candid": "^1.0.0",
     "@dfinity/identity": "^1.0.0",
     "@dfinity/principal": "^1.0.0",
+    "@infu/icblast": "^2.0.46",
     "@types/node": "^20.11.19",
+    "get-random-values": "^3.0.0",
+    "isomorphic-fetch": "^3.0.0",
     "jest": "^29.7.0",
+    "js-sha256": "^0.11.0",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
