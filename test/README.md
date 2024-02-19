@@ -6,8 +6,6 @@ https://github.com/ZenVoich/mocv
 https://github.com/dfinity/candid/releases
 ```
 
-2) Run `./build.sh`
+2) `yarn install`
 
-3) `yarn install`
-
-4) `yarn test`
+3) `yarn test`
