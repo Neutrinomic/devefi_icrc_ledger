@@ -1,20 +1,10 @@
 import { resolve } from 'node:path';
 import { PocketIc } from '@hadronous/pic';
 import { IDL } from '@dfinity/candid';
-import { _SERVICE as TestService, idlFactory as TestIdlFactory, init } from '../../../.dfx/local/canisters/test/service.did.js';
+import { _SERVICE as TestService, idlFactory as TestIdlFactory, init } from './build/main.idl.js';
 import { Principal } from '@dfinity/principal';
 
-const WASM_PATH = resolve(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    '.dfx',
-    'local',
-    'canisters',
-    'test',
-    'test.wasm',
-);
+const WASM_PATH = resolve(__dirname, "./build/main.wasm");
 
 export async function TestCan(pic:PocketIc, ledgerCanisterId:Principal) {
     

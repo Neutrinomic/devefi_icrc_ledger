@@ -3,7 +3,7 @@ import { Actor, PocketIc, createIdentity } from '@hadronous/pic';
 // import { IDL } from '@dfinity/candid';
 import {TestService, TestCan} from "./userCanister";
 
-import {ICRCLedgerService, ICRCLedger} from "./ledgerCanister";
+import {ICRCLedgerService, ICRCLedger} from "../icrc_ledger/ledgerCanister";
 
 describe('Counter', () => {
     let pic: PocketIc;
@@ -118,7 +118,7 @@ describe('Counter', () => {
 
     it('Compare user balances to snapshot', async () => {
       let accounts = await user.accounts();
-      let text_accounts = accounts.map(([subaccount, balance] : [Uint8Array, BigInt]) => [Buffer.from(subaccount).toString('hex'), balance]);
+      let text_accounts = accounts.map(([subaccount, balance] : [Uint8Array | number[], BigInt]) => [Buffer.from(subaccount).toString('hex'), balance]);
       expect(text_accounts).toMatchSnapshot()
     });
 

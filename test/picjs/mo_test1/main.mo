@@ -1,4 +1,4 @@
-import L "../../src";
+import L "../../../src";
 import Principal "mo:base/Principal";
 import Blob "mo:base/Blob";
 import Float "mo:base/Float";

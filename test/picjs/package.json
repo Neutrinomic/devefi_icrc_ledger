@@ -5,7 +5,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "test": "jest -c ./jest.config.ts"
+    "test": "./build.sh && jest -c ./jest.config.ts"
   },
   "dependencies": {
     "@dfinity/agent": "^1.0.0",

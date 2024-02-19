@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { PocketIc } from '@hadronous/pic';
-import { _SERVICE as ICRCLedgerService, idlFactory, init, LedgerArg } from '../icrc_ledger/ledger.idl';
+import { _SERVICE as ICRCLedgerService, idlFactory, init, LedgerArg } from './ledger.idl';
 import { IDL } from '@dfinity/candid';
 import { Principal } from '@dfinity/principal';
 

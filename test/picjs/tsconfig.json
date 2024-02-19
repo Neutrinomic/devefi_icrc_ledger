@@ -25,7 +25,5 @@
             "node"
         ]
     },
-    "include": [
-        "./src/*.ts"
-    ]
+    "include": ["**/*.spec.ts"]
 }
