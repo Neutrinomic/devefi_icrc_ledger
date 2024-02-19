@@ -37,9 +37,10 @@ describe('Counter', () => {
       // console.log(`Jo Principal: ${jo.getPrincipal().toText()}`);
       // console.log(`Bob Principal: ${bob.getPrincipal().toText()}`);
 
-      pic = await PocketIc.create();
+      pic = await PocketIc.create({sns:true});
+  
       // Ledger
-      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal());
+      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), pic.getSnsSubnet()?.id);
       ledger = ledgerfixture.actor;
       ledgerCanisterId = ledgerfixture.canisterId;
       
@@ -113,7 +114,7 @@ describe('Counter', () => {
         created_at_time: [],
       });
 
-      await passTime(50);
+      await passTime(120);
 
       const result2 = await user.get_info();
 
@@ -140,11 +141,15 @@ describe('Counter', () => {
     });
 
     
+    it('Check if error log is empty', async () => {
+      let errs = await user.get_errors();
+      expect(toState(errs)).toStrictEqual([]);
+    });
 
     async function passTime(n:number) {
       for (let i=0; i<n; i++) {
         await pic.advanceTime(3*1000);
-        await pic.tick(1);
+        await pic.tick(2);
       }
     }
 

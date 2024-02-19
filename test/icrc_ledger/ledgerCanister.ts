@@ -6,7 +6,7 @@ import { Principal } from '@dfinity/principal';
 
 const WASM_PATH = resolve(__dirname, "../icrc_ledger/ledger.wasm");
 
-export async function ICRCLedger(pic: PocketIc, me:Principal) {
+export async function ICRCLedger(pic: PocketIc, me:Principal, subnet:Principal | undefined) {
    
     let ledger_args:LedgerArg = {
         Init: {
@@ -41,6 +41,7 @@ export async function ICRCLedger(pic: PocketIc, me:Principal) {
         idlFactory,
         wasm: WASM_PATH,
         arg: IDL.encode(init({IDL}), [ledger_args]),
+        ...subnet?{targetSubnetId: subnet}:{},
     });
 
     return fixture;

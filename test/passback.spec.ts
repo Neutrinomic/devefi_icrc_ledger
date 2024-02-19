@@ -35,9 +35,9 @@ describe('Counter', () => {
   
     beforeAll(async () => {
 
-      pic = await PocketIc.create();
+      pic = await PocketIc.create({sns:true});
       // Ledger
-      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal());
+      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), pic.getSnsSubnet()?.id);
       ledger = ledgerfixture.actor;
       ledgerCanisterId = ledgerfixture.canisterId;
       
@@ -80,11 +80,11 @@ describe('Counter', () => {
 
     it(`Start passback`, async () => {
    
-      await passTime(1);
+      await passTime(2);
     
       await user.start();
 
-      await passTime(3);
+      await passTime(6);
 
       const result2 = await user.get_info();
 
