@@ -20,7 +20,7 @@ import Nat8 "mo:base/Nat8";
 module {
 
     let RETRY_EVERY_SEC:Float = 120;
-    let MAX_SENT_EACH_CYCLE:Nat = 125;
+    let MAX_SENT_EACH_CYCLE:Nat = 90;
 
     public type TransactionInput = {
         amount: Nat;

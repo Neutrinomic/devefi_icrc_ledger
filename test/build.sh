@@ -14,14 +14,14 @@ find . -maxdepth 1 -name '*.test.mo' | parallel '
   echo "Processing $base_name...";
   
   # Run moc to produce the wasm file. Adjust the moc command as necessary.
-  `mocv bin`/moc `mops sources` --idl -o "./build/${base_name}.wasm" --idl {} &&
+  `NODE_OPTIONS="--no-deprecation" npx mocv bin`/moc `mops sources` --idl --hide-warnings --error-detail 0 -o "./build/${base_name}.wasm" --idl {} 1>/dev/null 2>/dev/null &&
   
   # Assuming main.did is produced by the above moc command and matches the base name.
   # Generate JavaScript bindings
   didc bind "./build/${base_name}.did" --target js > "./build/${base_name}.idl.js" &&
   
   # Generate TypeScript bindings
-  didc bind "./build/${base_name}.did" --target ts > "./build/${base_name}.idl.d.ts";
+  didc bind "./build/${base_name}.did" --target ts > "./build/${base_name}.idl.d.ts" ;
   
   echo "Finished processing $base_name"
 '
