@@ -1,4 +1,4 @@
-import L "../src/icrc_ledger";
+import L "../../src/icrc_ledger";
 import Principal "mo:base/Principal";
 import Blob "mo:base/Blob";
 import Float "mo:base/Float";
