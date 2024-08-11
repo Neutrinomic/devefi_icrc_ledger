@@ -4,7 +4,6 @@ import Error "mo:base/Error";
 import Timer "mo:base/Timer";
 import Array "mo:base/Array";
 import Nat "mo:base/Nat";
-import Blob "mo:base/Blob";
 import Vector "mo:vector";
 import Debug "mo:base/Debug";
 import Prim "mo:⛔";
@@ -119,7 +118,7 @@ module {
             lastTxTime;
         };
 
-        private func cycle_shell() : async () {
+        private func cycle_shell<system>() : async () {
             try {
                 // We need it async or it won't throw errors
                 await cycle();
@@ -127,13 +126,13 @@ module {
                 onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
             };
 
-            if (started) ignore Timer.setTimer(#seconds 2, cycle_shell);
+            if (started) ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
         };
 
-        public func start() {
+        public func start<system>() {
             if (started) Debug.trap("already started");
             started := true;
-            ignore Timer.setTimer(#seconds 2, cycle_shell);
+            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
         };
 
         public func stop() {

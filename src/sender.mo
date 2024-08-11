@@ -85,7 +85,7 @@ module {
             getReaderLastTxTime := ?fn;
         };
 
-        private func cycle() : async () {
+        private func cycle<system>() : async () {
             let ?owner = mem.stored_owner else return;
             if (not started) return;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
@@ -137,7 +137,7 @@ module {
     
             };
     
-            ignore Timer.setTimer(#seconds 2, cycle);
+            ignore Timer.setTimer<system>(#seconds 2, cycle);
             let inst_end = Prim.performanceCounter(1);
             onCycleEnd(inst_end - inst_start);
         };
@@ -199,13 +199,13 @@ module {
             ignore BTree.insert<Nat64, Transaction>(mem.transactions, Nat64.compare, id, txr);
         };
 
-        public func start(owner:?Principal) {
+        public func start<system>(owner:?Principal) {
             if (not Option.isNull(owner)) mem.stored_owner := owner;
             if (Option.isNull(mem.stored_owner)) return;
 
             if (started) Debug.trap("already started");
             started := true;
-            ignore Timer.setTimer(#seconds 2, cycle);
+            ignore Timer.setTimer<system>(#seconds 2, cycle);
         };
 
         public func stop() {

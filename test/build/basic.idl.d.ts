@@ -22,7 +22,7 @@ export interface Meta {
   'minter' : [] | [Account],
   'symbol' : string,
 }
-export interface anon_class_13_1 {
+export interface _anon_class_13_1 {
   'accounts' : ActorMethod<[], Array<[Uint8Array | number[], bigint]>>,
   'getMeta' : ActorMethod<[], Meta>,
   'getPending' : ActorMethod<[], bigint>,
@@ -32,6 +32,6 @@ export interface anon_class_13_1 {
   'start' : ActorMethod<[], undefined>,
   'ver' : ActorMethod<[], bigint>,
 }
-export interface _SERVICE extends anon_class_13_1 {}
+export interface _SERVICE extends _anon_class_13_1 {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];
