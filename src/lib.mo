@@ -183,7 +183,7 @@ module {
             onError = logErr; // In case a cycle throws an error
             onCycleEnd = func (i: Nat64) { reader_instructions_cost := i }; // returns the instructions the cycle used. 
                                                         // It can include multiple calls to onRead
-            onRead = func (transactions: [IcrcReader.Transaction]) {
+            onRead = func (transactions: [IcrcReader.Transaction], _) {
                 icrc_sender.confirm(transactions);
                 
                 let ?meta = lmem.meta else Debug.trap("ERR102"); // Not ready yet; 

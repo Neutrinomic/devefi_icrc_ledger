@@ -35,7 +35,7 @@ module {
         start_from_block: {#id:Nat; #last};
         onError : (Text) -> (); // If error occurs during following and processing it will return the error
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
-        onRead : [Ledger.Transaction] -> ();
+        onRead : ([Ledger.Transaction], Nat) -> ();
     }) {
         var started = false;
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
@@ -67,7 +67,7 @@ module {
 
             if (rez.archived_transactions.size() == 0) {
                 // We can just process the transactions that are inside the ledger and not inside archive
-                onRead(rez.transactions);
+                onRead(rez.transactions, mem.last_indexed_tx);
                 mem.last_indexed_tx += rez.transactions.size();
                 if (rez.transactions.size() < 1000) {
                     // We have reached the end, set the last tx time to the current time
@@ -99,12 +99,12 @@ module {
 
                 for (u in sorted.vals()) {
                     assert (u.start == mem.last_indexed_tx);
-                    onRead(u.transactions);
+                    onRead(u.transactions, mem.last_indexed_tx);
                     mem.last_indexed_tx += u.transactions.size();
                 };
 
                 if (rez.transactions.size() != 0) {
-                    onRead(rez.transactions);
+                    onRead(rez.transactions, mem.last_indexed_tx);
                     mem.last_indexed_tx += rez.transactions.size();
                 };
             };
