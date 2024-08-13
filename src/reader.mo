@@ -41,8 +41,8 @@ module {
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
         var lastTxTime : Nat64 = 0;
 
-        private func cycle() : async () {
-            if (not started) return;
+        private func cycle() : async Bool {
+            if (not started) return false;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
             if (mem.last_indexed_tx == 0) {
@@ -64,6 +64,7 @@ module {
                 start = mem.last_indexed_tx;
                 length = 1000;
             });
+            let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false;
 
             if (rez.archived_transactions.size() == 0) {
                 // We can just process the transactions that are inside the ledger and not inside archive
@@ -111,6 +112,9 @@ module {
 
             let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
             onCycleEnd(inst_end - inst_start);
+
+            quick_cycle;
+
         };
 
         /// Returns the last tx time or the current time if there are no more transactions to read
@@ -119,14 +123,15 @@ module {
         };
 
         private func cycle_shell<system>() : async () {
+            var quick = false;
             try {
                 // We need it async or it won't throw errors
-                await cycle();
+                quick := await cycle();
             } catch (e) {
                 onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
             };
 
-            if (started) ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
+            if (started) ignore Timer.setTimer<system>(#seconds(if (quick) 0 else 2), cycle_shell);
         };
 
         public func start<system>() {
