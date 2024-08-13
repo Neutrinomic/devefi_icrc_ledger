@@ -10,6 +10,7 @@ import Prim "mo:⛔";
 import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
 import Int "mo:base/Int";
+import List "mo:base/List";
 
 module {
     public type Transaction = Ledger.Transaction;
@@ -62,7 +63,7 @@ module {
 
             let rez = await ledger.get_transactions({
                 start = mem.last_indexed_tx;
-                length = 1000;
+                length = 2000 * 40;
             });
             let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false;
 
@@ -70,43 +71,71 @@ module {
                 // We can just process the transactions that are inside the ledger and not inside archive
                 onRead(rez.transactions, mem.last_indexed_tx);
                 mem.last_indexed_tx += rez.transactions.size();
-                if (rez.transactions.size() < 1000) {
-                    // We have reached the end, set the last tx time to the current time
-                    lastTxTime := Nat64.fromNat(Int.abs(Time.now()));
-                } else {
-                    // Set the time of the last transaction
-                    lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
-                };
+         
+                if (rez.transactions.size() != 0) lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
+            
             } else {
                 // We need to collect transactions from archive and get them in order
                 let unordered = Vector.new<TransactionUnordered>(); // Probably a better idea would be to use a large enough var array
+                // onError("working on archived blocks");
 
                 for (atx in rez.archived_transactions.vals()) {
-                    let txresp = await atx.callback({
-                        start = atx.start;
-                        length = atx.length;
-                    });
+                    let args_starts = Array.tabulate<Nat>(Nat.min(40, 1 + atx.length/2000), func(i) = atx.start + i*2000);
+                    let args = Array.map<Nat, Ledger.GetBlocksRequest>( args_starts, func(i) = {start = i; length = if (i - atx.start:Nat+2000 <= atx.length) 2000 else atx.length + atx.start - i } );
 
-                    Vector.add(
-                        unordered,
-                        {
-                            start = atx.start;
-                            transactions = txresp.transactions;
-                        },
-                    );
+                    // onError("args_starts: " # debug_show(args));
+
+
+                    var buf = List.nil<async Ledger.TransactionRange>();
+                    var data = List.nil<Ledger.TransactionRange>();
+                    for (arg in args.vals()) {
+                        // The calls are sent here without awaiting anything
+                        let promise = atx.callback(arg);
+                        buf := List.push(promise, buf); 
+                    };
+
+                    for (promise in List.toIter(buf)) {
+                        // Await results of all promises. We recieve them in sequential order
+                        data := List.push(await promise, data);
+                    };
+                    let chunks = List.toArray(data);
+                    
+                    var chunk_idx = 0;
+                    for (chunk in chunks.vals()) {
+                        if (chunk.transactions.size() > 0) {
+                            // If chunks (except the last one) are smaller than 2000 tx then implementation is strange
+                            if ((chunk_idx < (args.size() - 1:Nat)) and (chunk.transactions.size() != 2000)) {
+                                onError("chunk.transactions.size() != 2000 | chunk.transactions.size(): " # Nat.toText(chunk.transactions.size()));
+                                return false;
+                            };
+                        Vector.add(
+                            unordered,
+                            {
+                                start = args_starts[chunk_idx];
+                                transactions = chunk.transactions;
+                            },
+                        );
+                        };
+                        chunk_idx += 1;
+                    };
                 };
 
                 let sorted = Array.sort<TransactionUnordered>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
 
                 for (u in sorted.vals()) {
-                    assert (u.start == mem.last_indexed_tx);
+                    if (u.start != mem.last_indexed_tx) {
+                        onError("u.start != mem.last_indexed_tx | u.start: " # Nat.toText(u.start) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " u.transactions.size(): " # Nat.toText(u.transactions.size()));
+                        return false;
+                    };
                     onRead(u.transactions, mem.last_indexed_tx);
                     mem.last_indexed_tx += u.transactions.size();
+                    if (u.transactions.size() != 0) lastTxTime := u.transactions[u.transactions.size() - 1].timestamp;
                 };
 
                 if (rez.transactions.size() != 0) {
                     onRead(rez.transactions, mem.last_indexed_tx);
                     mem.last_indexed_tx += rez.transactions.size();
+                    lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
                 };
             };
 
