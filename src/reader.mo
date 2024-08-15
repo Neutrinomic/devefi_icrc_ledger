@@ -11,6 +11,7 @@ import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
 import Int "mo:base/Int";
 import List "mo:base/List";
+import Iter "mo:base/Iter";
 
 module {
     public type Transaction = Ledger.Transaction;
@@ -42,7 +43,7 @@ module {
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
         var lastTxTime : Nat64 = 0;
 
-        var maxTransactionsInCall:Nat = 2000;
+        let maxTransactionsInCall:Nat = 2000;
 
         private func cycle() : async Bool {
             if (not started) return false;
@@ -107,12 +108,9 @@ module {
                         if (chunk.transactions.size() > 0) {
                             // If chunks (except the last one) are smaller than 2000 tx then implementation is strange
                             if ((chunk_idx < (args.size() - 1:Nat)) and (chunk.transactions.size() != maxTransactionsInCall)) {
-                                if (mem.last_indexed_tx == 0) {
-                                    maxTransactionsInCall := chunk.transactions.size(); // Try to adapt to lower tx count if it's the first cycle
-                                    return true;
-                                };
-                               
+
                                 onError("chunk.transactions.size() != " # Nat.toText(maxTransactionsInCall) # " | chunk.transactions.size(): " # Nat.toText(chunk.transactions.size()));
+                               
                                 return false;
                             };
                         Vector.add(
@@ -139,7 +137,12 @@ module {
                     if (u.transactions.size() != 0) lastTxTime := u.transactions[u.transactions.size() - 1].timestamp;
                 };
 
+
                 if (rez.transactions.size() != 0) {
+                    if (rez.first_index != mem.last_indexed_tx) {
+                        onError("rez.first_index !== mem.last_indexed_tx | rez.first_index: " # Nat.toText(rez.first_index) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " rez.transactions.size(): " # Nat.toText(rez.transactions.size()));
+                        return false;
+                    };
                     onRead(rez.transactions, mem.last_indexed_tx);
                     mem.last_indexed_tx += rez.transactions.size();
                     lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
