@@ -42,6 +42,8 @@ module {
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
         var lastTxTime : Nat64 = 0;
 
+        var maxTransactionsInCall:Nat = 2000;
+
         private func cycle() : async Bool {
             if (not started) return false;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
@@ -63,7 +65,7 @@ module {
 
             let rez = await ledger.get_transactions({
                 start = mem.last_indexed_tx;
-                length = 2000 * 40;
+                length = maxTransactionsInCall * 40;
             });
             let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false;
 
@@ -80,8 +82,8 @@ module {
                 // onError("working on archived blocks");
 
                 for (atx in rez.archived_transactions.vals()) {
-                    let args_starts = Array.tabulate<Nat>(Nat.min(40, 1 + atx.length/2000), func(i) = atx.start + i*2000);
-                    let args = Array.map<Nat, Ledger.GetBlocksRequest>( args_starts, func(i) = {start = i; length = if (i - atx.start:Nat+2000 <= atx.length) 2000 else atx.length + atx.start - i } );
+                    let args_starts = Array.tabulate<Nat>(Nat.min(40, 1 + atx.length/maxTransactionsInCall), func(i) = atx.start + i*maxTransactionsInCall);
+                    let args = Array.map<Nat, Ledger.GetBlocksRequest>( args_starts, func(i) = {start = i; length = if (i - atx.start:Nat+maxTransactionsInCall <= atx.length) maxTransactionsInCall else atx.length + atx.start - i } );
 
                     // onError("args_starts: " # debug_show(args));
 
@@ -104,8 +106,13 @@ module {
                     for (chunk in chunks.vals()) {
                         if (chunk.transactions.size() > 0) {
                             // If chunks (except the last one) are smaller than 2000 tx then implementation is strange
-                            if ((chunk_idx < (args.size() - 1:Nat)) and (chunk.transactions.size() != 2000)) {
-                                onError("chunk.transactions.size() != 2000 | chunk.transactions.size(): " # Nat.toText(chunk.transactions.size()));
+                            if ((chunk_idx < (args.size() - 1:Nat)) and (chunk.transactions.size() != maxTransactionsInCall)) {
+                                if (mem.last_indexed_tx == 0) {
+                                    maxTransactionsInCall := chunk.transactions.size(); // Try to adapt to lower tx count if it's the first cycle
+                                    return true;
+                                };
+                               
+                                onError("chunk.transactions.size() != " # Nat.toText(maxTransactionsInCall) # " | chunk.transactions.size(): " # Nat.toText(chunk.transactions.size()));
                                 return false;
                             };
                         Vector.add(
