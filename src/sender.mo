@@ -19,8 +19,7 @@ import Nat8 "mo:base/Nat8";
 
 module {
 
-    let RETRY_EVERY_SEC:Float = 120;
-    let MAX_SENT_EACH_CYCLE:Nat = 90;
+
 
     public type TransactionInput = {
         amount: Nat;
@@ -48,6 +47,9 @@ module {
             var stored_owner = null;
         };
     };
+    let MAX_SENT_EACH_CYCLE:Nat = 90;
+
+    let RETRY_EVERY_SEC:Float = 120_000_000_000; // 2 minutes
 
     let permittedDriftNanos : Nat64 = 60_000_000_000;
     let transactionWindowNanos : Nat64 = 86400_000_000_000;
@@ -76,10 +78,8 @@ module {
     }) {
         var started = false;
         let ledger = actor(Principal.toText(ledger_id)) : Ledger.Oneway;
-        let ledger_cb = actor(Principal.toText(ledger_id)) : Ledger.Self;
         var getReaderLastTxTime : ?(() -> (Nat64)) = null;
         
-        var cycle_idx = 0;
 
         public func setGetReaderLastTxTime(fn : () -> (Nat64)) {
             getReaderLastTxTime := ?fn;
@@ -137,9 +137,17 @@ module {
     
             };
     
-            ignore Timer.setTimer<system>(#seconds 2, cycle);
             let inst_end = Prim.performanceCounter(1);
             onCycleEnd(inst_end - inst_start);
+        };
+
+        private func cycle_shell<system>() : async () {
+            try {
+                await cycle<system>();
+            } catch (e) {
+                onError("sender_shell:" # Error.message(e));
+            };
+            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
         };
 
         private func getTxMemoFrom(tx: Ledger.Transaction) : ?(Ledger.Account, Blob) {
@@ -205,7 +213,7 @@ module {
 
             if (started) Debug.trap("already started");
             started := true;
-            ignore Timer.setTimer<system>(#seconds 2, cycle);
+            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
         };
 
         public func stop() {

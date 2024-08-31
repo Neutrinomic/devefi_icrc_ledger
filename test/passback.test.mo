@@ -20,7 +20,7 @@ actor class({ledgerId: Principal}) = this {
     });
 
     
-    ledger.start();
+    ledger.start<system>();
     //---
 
     public func start() {
