@@ -127,7 +127,7 @@ module {
                         fee = ?fee;
                     });
                     sent_count += 1;
-                    tx.tries += 1;
+                    tx.tries := Int.abs(time_for_try);
                 } catch (e) { 
                     onError("sender:" # Error.message(e));
                     break vtransactions;
