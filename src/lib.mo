@@ -87,7 +87,7 @@ module {
     ///     stable let lmem = L.LMem();
     ///     let ledger = L.Ledger(lmem, "bnz7o-iuaaa-aaaaa-qaaaa-cai", #last);
     /// ```
-    public class Ledger(lmem: Mem, ledger_id_txt: Text, start_from_block : ({#id:Nat; #last})) {
+    public class Ledger<system>(lmem: Mem, ledger_id_txt: Text, start_from_block : ({#id:Nat; #last})) {
 
         let ledger_id = Principal.fromText(ledger_id_txt);
         var next_tx_id : Nat64 = 0;
@@ -229,8 +229,8 @@ module {
         icrc_sender.setGetReaderLastTxTime(icrc_reader.getReaderLastTxTime);
 
         /// Set the actor principal. If `start` has been called before, it will really start the ledger.
-        public func setOwner(act: actor {}) : () {
-            lmem.actor_principal := ?Principal.fromActor(act);
+        public func setOwner(me: Principal) : () {
+            lmem.actor_principal := ?me;
         };
 
         private func refreshFee() : async () {
@@ -259,9 +259,9 @@ module {
         };
 
         /// Start the ledger timers
-        public func start<system>() : () {
-            ignore Timer.setTimer<system>(#seconds 0, delayed_start);
-        };
+
+        
+
 
         private func retrieveMeta() : async () {
             try {
@@ -399,7 +399,7 @@ module {
         };
 
 
-
+        ignore Timer.setTimer<system>(#seconds 0, delayed_start);
 
 
 
