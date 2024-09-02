@@ -34,7 +34,7 @@ actor class({ledgerId: Principal}) = this {
     var next_subaccount_id:Nat64 = 100000;
 
     stable let lmem = L.LMem();
-    let ledger = L.Ledger(lmem, Principal.toText(ledgerId), #last);
+    let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last);
     
     ledger.onMint(func (t) {
        // if sent mint transaction to this canister
@@ -58,12 +58,11 @@ actor class({ledgerId: Principal}) = this {
         next_subaccount_id += 1;
     });
     
-    ledger.start<system>();
     //---
 
     public func start() {
         Debug.print("started");
-        ledger.setOwner(this);
+        ledger.setOwner(Principal.fromActor(this));
         };
 
     public query func get_balance(s: ?Blob) : async Nat {

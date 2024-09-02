@@ -13,18 +13,17 @@ import Debug "mo:base/Debug";
 actor class({ledgerId: Principal}) = this {
 
     stable let lmem = L.LMem();
-    let ledger = L.Ledger(lmem, Principal.toText(ledgerId), #last);
+    let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last);
     
     ledger.onReceive(func (t) {
         ignore ledger.send({ to = t.from; amount = t.amount; from_subaccount = t.to.subaccount; });
     });
 
     
-    ledger.start<system>();
     //---
 
     public func start() {
-        ledger.setOwner(this);
+        ledger.setOwner(Principal.fromActor(this));
         };
 
     public query func get_balance(s: ?Blob) : async Nat {
