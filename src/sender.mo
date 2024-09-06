@@ -64,7 +64,7 @@ module {
         // (giving the reader 2 x TX_WINDOW time to catch up and remove the transaction)
         if (lastReaderTxTime + allowedLagToChangeWindow < now) return time; // Don't change the window if the reader is lagging
         let window_idx = (now - time) / retryWindow;
-        return time + (window_idx * retryWindow);
+        return time + (window_idx * retryWindow); // TODO: why time?, probably not
     };
 
     public class Sender({
@@ -141,14 +141,6 @@ module {
             onCycleEnd(inst_end - inst_start);
         };
 
-        private func cycle_shell<system>() : async () {
-            try {
-                await cycle<system>();
-            } catch (e) {
-                onError("sender_shell:" # Error.message(e));
-            };
-            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
-        };
 
         private func getTxMemoFrom(tx: Ledger.Transaction) : ?(Ledger.Account, Blob) {
             if (tx.kind == "mint") {
@@ -213,7 +205,7 @@ module {
 
             if (started) Debug.trap("already started");
             started := true;
-            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
+            ignore Timer.recurringTimer<system>(#seconds 2, cycle);
         };
 
         public func stop() {
