@@ -53,18 +53,14 @@ module {
 
     let permittedDriftNanos : Nat64 = 60_000_000_000;
     let transactionWindowNanos : Nat64 = 86400_000_000_000;
-    let retryWindow : Nat64 = 172800_000_000_000; // 2 x transactionWindowNanos
-    let allowedLagToChangeWindow : Nat64 = 900_000_000_000; // 15 minutes
-
-    private func adjustTXWINDOW(lastReaderTxTime: Nat64, now:Nat64, time : Nat64) : Nat64 {
+    let retryWindow : Nat64 = 72200_000_000_000;
+    let maxReaderLag : Nat64 = 1800_000_000_000; // 30 minutes
+    private func adjustTXWINDOW(now:Nat64, time : Nat64) : Nat64 {
         // If tx is still not sent after the transaction window, we need to
         // set its created_at_time to the current window or it will never be sent no matter how much we retry.
-        // it has to be set in a way that will still make deduplication work (meaning it can't change during this window)
-        // We only try to change the created_at after 2 times the window duration 
-        // (giving the reader 2 x TX_WINDOW time to catch up and remove the transaction)
-        if (lastReaderTxTime + allowedLagToChangeWindow < now) return time; // Don't change the window if the reader is lagging
-        let window_idx = (now - time) / retryWindow;
-        return time + (window_idx * retryWindow); // TODO: why time?, probably not
+        if (time >= now - retryWindow) return time;
+        let window_idx = now / retryWindow;
+        return window_idx * retryWindow;
     };
 
     public class Sender({
@@ -100,7 +96,10 @@ module {
             let ?gr_fn = getReaderLastTxTime else Debug.trap("Err getReaderLastTxTime not set");
             let lastReaderTxTime = gr_fn();  // This is the last time the reader has seen a transaction or the current time if there are no more transactions
 
-
+            if (lastReaderTxTime < nowU64 - maxReaderLag) {
+                onError("Reader is lagging behind by " # Nat64.toText(nowU64 - lastReaderTxTime));
+                return; // Don't attempt to send transactions if the reader is lagging too far behind
+            };
             var sent_count = 0;
             label vtransactions for ((id, tx) in transactions_to_send.results.vals()) {
                 
@@ -113,8 +112,7 @@ module {
 
                 if (tx.tries >= time_for_try) continue vtransactions;
                 
-                let created_at_adjusted = adjustTXWINDOW(lastReaderTxTime, nowU64, tx.created_at_time);
-                if ((created_at_adjusted < nowU64) and (nowU64 - created_at_adjusted > transactionWindowNanos + permittedDriftNanos)) continue vtransactions; // Too OLD
+                let created_at_adjusted = adjustTXWINDOW(nowU64, tx.created_at_time);
 
                 try {
                     // Relies on transaction deduplication https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-1/README.md
