@@ -177,6 +177,7 @@ module {
 
         // Reader
         let icrc_reader = IcrcReader.Reader({
+            maxSimultaneousRequests = 40;
             mem = lmem.reader;
             ledger_id;
             start_from_block;
