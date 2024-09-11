@@ -38,6 +38,7 @@ module {
         onError : (Text) -> (); // If error occurs during following and processing it will return the error
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
         onRead : ([Ledger.Transaction], Nat) -> ();
+        maxSimultaneousRequests : Nat;
     }) {
         var started = false;
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
@@ -54,7 +55,6 @@ module {
             let now = Time.now();
             if (now - lock < MAX_TIME_LOCKED) return;
             lock := now;
-
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
             if (mem.last_indexed_tx == 0) {
@@ -72,11 +72,16 @@ module {
                 };
             };
             let query_start = mem.last_indexed_tx;
-            let rez = await ledger.get_transactions({
+            let rez = try {
+                await ledger.get_transactions({
                 start = query_start;
-                length = maxTransactionsInCall * 40;
+                length = maxTransactionsInCall * maxSimultaneousRequests;
             });
-
+            } catch (e) {
+                    onError("Error in ledger get_transactions: " # Error.message(e));
+                    lock := 0;
+                    return;
+            };
             if (query_start != mem.last_indexed_tx) {lock:=0; return;};
 
             if (rez.archived_transactions.size() == 0) {
@@ -92,7 +97,7 @@ module {
                 // onError("working on archived blocks");
 
                 for (atx in rez.archived_transactions.vals()) {
-                    let args_starts = Array.tabulate<Nat>(Nat.min(40, 1 + atx.length/maxTransactionsInCall), func(i) = atx.start + i*maxTransactionsInCall);
+                    let args_starts = Array.tabulate<Nat>(Nat.min(maxSimultaneousRequests, 1 + atx.length/maxTransactionsInCall), func(i) = atx.start + i*maxTransactionsInCall);
                     let args = Array.map<Nat, Ledger.GetBlocksRequest>( args_starts, func(i) = {start = i; length = if (i - atx.start:Nat+maxTransactionsInCall <= atx.length) maxTransactionsInCall else atx.length + atx.start - i } );
 
                     // onError("args_starts: " # debug_show(args));
@@ -105,10 +110,15 @@ module {
                         let promise = atx.callback(arg);
                         buf := List.push(promise, buf); 
                     };
-
                     for (promise in List.toIter(buf)) {
                         // Await results of all promises. We recieve them in sequential order
+                        try {
                         data := List.push(await promise, data);
+                        } catch (e) {
+                            onError("Error in archive callback: " # Error.message(e));
+                            lock := 0;
+                            return;
+                        }
                     };
                     let chunks = List.toArray(data);
                     
