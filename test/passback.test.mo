@@ -16,7 +16,13 @@ actor class({ledgerId: Principal}) = this {
     let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last);
     
     ledger.onReceive(func (t) {
-        ignore ledger.send({ to = t.from; amount = t.amount; from_subaccount = t.to.subaccount; });
+        switch(t.from) {
+            case (#icrc(from)) {
+                ignore ledger.send({ to = from; amount = t.amount; from_subaccount = t.to.subaccount; });
+            };
+            case (_) ();
+        };
+        
     });
 
     

@@ -181,8 +181,6 @@ module {
             lastTxTime;
         };
 
-
-
         public func start<system>() {
             if (started) Debug.trap("already started");
             started := true;

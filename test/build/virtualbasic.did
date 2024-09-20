@@ -1,0 +1,42 @@
+type _anon_class_14_1 = 
+ service {
+   accounts: () -> (vec record {
+                          blob;
+                          nat;
+                        }) query;
+   getMeta: () -> (Meta) query;
+   getPending: () -> (nat) query;
+   get_balance: (opt blob) -> (nat) query;
+   get_errors: () -> (vec text) query;
+   get_info: () -> (Info) query;
+   ledger_accounts: () -> (vec record {
+                                 blob;
+                                 nat;
+                               }) query;
+   start: () -> () oneway;
+   ver: () -> (nat) query;
+ };
+type Meta = 
+ record {
+   decimals: nat8;
+   fee: nat;
+   minter: opt Account;
+   symbol: text;
+ };
+type Info = 
+ record {
+   accounts: nat;
+   actor_principal: opt principal;
+   errors: nat;
+   lastTxTime: nat64;
+   last_indexed_tx: nat;
+   pending: nat;
+   reader_instructions_cost: nat64;
+   sender_instructions_cost: nat64;
+ };
+type Account = 
+ record {
+   owner: principal;
+   subaccount: opt blob;
+ };
+service : (record {ledgerId: principal;}) -> _anon_class_14_1

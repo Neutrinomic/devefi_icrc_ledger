@@ -8,6 +8,7 @@ import I "mo:itertools/Iter";
 import Nat8 "mo:base/Nat8";
 import Nat64 "mo:base/Nat64";
 import Debug "mo:base/Debug";
+import Virtual "../src/virtual";
 
 
 actor class({ledgerId: Principal}) = this {
@@ -36,17 +37,18 @@ actor class({ledgerId: Principal}) = this {
     stable let lmem = L.LMem();
     let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last);
     
+    let virtual_mem = Virtual.Mem();
+    let virtual = Virtual.Virtual<system>(virtual_mem, ledger);
 
-    let dust = 10000; // leave dust to try the balance of function
 
-    ledger.onReceive(func (t) {
+    virtual.onReceive(func (t) {
 
-        if (t.to.subaccount == null) {
+        if (t.to_subaccount == null) {
             // we will split into 1,000 subaccounts
             var i = 0;
             label sending loop {
                 let amount = t.amount / 10000; // Each account gets 1/10000
-                ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to.subaccount; });
+                ignore virtual.send({ to = {owner=ledger.me(); subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to_subaccount; });
                 i += 1;
                 if (i >= 1_000) break sending;
             }
@@ -54,8 +56,10 @@ actor class({ledgerId: Principal}) = this {
             // if it has subaccount
             // we will pass half to another subaccount
             if (t.amount/10 < ledger.getFee() ) return; // if we send that it will be removed from our balance but won't register
-            ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount / 10 ; from_subaccount = t.to.subaccount; });
+            let subaccount_id = next_subaccount_id;
             next_subaccount_id += 1;
+            ignore virtual.send({ to = {owner=ledger.me(); subaccount=test_subaccount(subaccount_id)}; amount = t.amount / 10 ; from_subaccount = t.to_subaccount; });
+            
         }
     });
     
@@ -79,6 +83,10 @@ actor class({ledgerId: Principal}) = this {
         };
 
     public query func accounts() : async [(Blob, Nat)] {
+        Iter.toArray(virtual.accounts());
+        };
+
+    public query func ledger_accounts() : async [(Blob, Nat)] {
         Iter.toArray(ledger.accounts());
         };
 

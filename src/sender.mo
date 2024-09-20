@@ -81,6 +81,10 @@ module {
             getReaderLastTxTime := ?fn;
         };
 
+        public func isSent(id:Nat64) : Bool {
+            BTree.has(mem.transactions, Nat64.compare, id);
+        };
+
         private func cycle<system>() : async () {
             let ?owner = mem.stored_owner else return;
             if (not started) return;
@@ -96,7 +100,7 @@ module {
             let ?gr_fn = getReaderLastTxTime else Debug.trap("Err getReaderLastTxTime not set");
             let lastReaderTxTime = gr_fn();  // This is the last time the reader has seen a transaction or the current time if there are no more transactions
 
-            if (lastReaderTxTime < nowU64 - maxReaderLag) {
+            if (lastReaderTxTime != 0 and lastReaderTxTime < nowU64 - maxReaderLag) {
                 onError("Reader is lagging behind by " # Nat64.toText(nowU64 - lastReaderTxTime));
                 return; // Don't attempt to send transactions if the reader is lagging too far behind
             };
