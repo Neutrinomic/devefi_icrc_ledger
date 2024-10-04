@@ -82,7 +82,7 @@ module {
         };
 
         public func isSent(id:Nat64) : Bool {
-            BTree.has(mem.transactions, Nat64.compare, id);
+            not BTree.has(mem.transactions, Nat64.compare, id);
         };
 
         private func cycle<system>() : async () {
