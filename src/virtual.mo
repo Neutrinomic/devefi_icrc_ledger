@@ -207,6 +207,17 @@ module {
 
                 // External transfer to a subaccount
                 let pass = do ? { callback_onRecieveShouldVirtualize!(tx); };
+
+                // Ignore dust
+                if (tx.amount < ledger.getFee()*2) return;
+                
+                // Check if account was created
+                let exists = Map.has(mem.accounts, Map.bhash, L.subaccountToBlob(tx.to.subaccount));
+
+                // Won't open new account in memory if dust is sent
+                if (not exists and tx.amount < ledger.getFee()*100) return;
+
+
                 if (Option.isNull(pass) or pass == ?true) {
                     ignore ledger.send({
                         from_subaccount = tx.to.subaccount; 
