@@ -11,28 +11,27 @@ import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
 import Int "mo:base/Int";
 import List "mo:base/List";
-import Iter "mo:base/Iter";
+import Ver1 "./memory/v1";
+import MU "mo:mosup";
 
 module {
     public type Transaction = Ledger.Transaction;
 
-    public type Mem = {
-            var last_indexed_tx : Nat;
+    public module Mem {
+        public module Reader {
+            public let V1 = Ver1.Reader;
         };
+    };
 
     type TransactionUnordered = {
             start : Nat;
             transactions : [Ledger.Transaction];
         };
         
-    public func Mem() : Mem {
-            return {
-                var last_indexed_tx = 0;
-            };
-        };
+    let VM = Mem.Reader.V1;
 
     public class Reader<system>({
-        mem : Mem;
+        xmem : MU.MemShell<VM.Mem>;
         ledger_id : Principal;
         start_from_block: {#id:Nat; #last};
         onError : (Text) -> (); // If error occurs during following and processing it will return the error
@@ -40,6 +39,7 @@ module {
         onRead : ([Ledger.Transaction], Nat) -> ();
         maxSimultaneousRequests : Nat;
     }) {
+        let mem = MU.access(xmem);
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
         var lastTxTime : Nat64 = 0;
 
@@ -176,6 +176,10 @@ module {
         /// Returns the last tx time or the current time if there are no more transactions to read
         public func getReaderLastTxTime() : Nat64 { 
             lastTxTime;
+        };
+
+        public func getLastReadTxIndex() : Nat {
+            mem.last_indexed_tx;
         };
 
         ignore Timer.setTimer<system>(#seconds 0, cycle);

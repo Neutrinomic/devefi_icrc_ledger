@@ -14,7 +14,7 @@ actor class({ledgerId: Principal}) = this {
 
 
 
-    stable let lmem = L.LMem();
+    stable let lmem = L.Mem.Ledger.V1.new();
     let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last, Principal.fromActor(this));
     
     ledger.onReceive(func (t) {
@@ -53,7 +53,7 @@ actor class({ledgerId: Principal}) = this {
         4
         };
     
-    public query func getMeta() : async L.Meta {
+    public query func getMeta() : async L.Mem.Ledger.V1.Meta {
         ledger.getMeta()
         };
 }

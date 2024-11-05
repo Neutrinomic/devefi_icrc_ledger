@@ -3,4 +3,5 @@
 --package swb .mops/swb@1.1.1/src
 --package base .mops/base@0.12.1/src
 --package stableheapbtreemap .mops/stableheapbtreemap@1.5.0/src
+--package mosup .mops/mosup@0.1.1/src
 --package itertools .mops/itertools@0.2.1/src

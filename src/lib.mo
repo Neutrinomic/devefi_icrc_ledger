@@ -13,42 +13,25 @@ import Debug "mo:base/Debug";
 import SWB "mo:swb";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
-import Set "mo:map/Set";
+import Ver1 "./memory/v1";
+import MU "mo:mosup";
 
 module {
     type R<A, B> = Result.Result<A, B>;
+
+    public module Mem {
+        public module Ledger {
+            public let V1 = Ver1.Ledger;
+        };
+    };
 
     /// No other errors are currently possible
     public type SendError = {
         #InsufficientFunds;
     };
 
-    /// Local account memory
-    public type AccountMem = {
-        var balance : Nat;
-        var in_transit : Nat;
-    };
+    let VM = Mem.Ledger.V1;
 
-    public type Mem = {
-        reader : IcrcReader.Mem;
-        sender : IcrcSender.Mem;
-        accounts : Map.Map<Blob, AccountMem>;
-        var meta : ?Meta;
-        var next_tx_id : Nat64;
-    };
-
-    /// Used to create new ledger memory (it's outside of the class to be able to place it in stable memory)
-    public func LMem() : Mem {
-        {
-            reader = IcrcReader.Mem();
-            sender = IcrcSender.Mem();
-            accounts = Map.new<Blob, AccountMem>();
-            var meta = null;
-            minter = null;
-            var next_tx_id : Nat64 = 0;
-
-        };
-    };
 
     public func subaccountToBlob(s : ?Blob) : Blob {
         let ?a = s else return Blob.fromArray([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -67,12 +50,7 @@ module {
         lastTxTime : Nat64;
     };
 
-    public type Meta = {
-        symbol : Text;
-        decimals : Nat8;
-        minter : ?ICRCLedger.Account;
-        fee : Nat;
-    };
+
 
     public type AccountMixed = {
         #icrc : ICRCLedger.Account;
@@ -102,8 +80,8 @@ module {
     ///     stable let lmem = L.LMem();
     ///     let ledger = L.Ledger(lmem, "bnz7o-iuaaa-aaaaa-qaaaa-cai", #last);
     /// ```
-    public class Ledger<system>(lmem : Mem, ledger_id_txt : Text, start_from_block : ({ #id : Nat; #last }), me_can : Principal) {
-
+    public class Ledger<system>(xmem : MU.MemShell<VM.Mem>, ledger_id_txt : Text, start_from_block : ({ #id : Nat; #last }), me_can : Principal) {
+        let lmem = MU.access(xmem);
         let ledger_id = Principal.fromText(ledger_id_txt);
         let errors = SWB.SlidingWindowBuffer<Text>();
 
@@ -135,7 +113,7 @@ module {
 
         let icrc_sender = IcrcSender.Sender<system>({
             ledger_id;
-            mem = lmem.sender;
+            xmem = lmem.sender;
             getFee = func() : Nat {
                 let ?m = lmem.meta else trap("ERR100");
                 m.fee;
@@ -154,13 +132,13 @@ module {
 
 
 
-        public func getMeta() : Meta {
+        public func getMeta() : VM.Meta {
             let ?m = lmem.meta else trap("ERR101");
             m;
         };
 
         private func handle_incoming_amount(subaccount : ?Blob, amount : Nat) : () {
-            switch (Map.get<Blob, AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount))) {
+            switch (Map.get<Blob, VM.AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount))) {
                 case (?acc) {
                     acc.balance += amount : Nat;
                 };
@@ -193,7 +171,7 @@ module {
             };
 
             if (acc.balance == 0 and acc.in_transit == 0) {
-                ignore Map.remove<Blob, AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount));
+                ignore Map.remove<Blob, VM.AccountMem>(lmem.accounts, Map.bhash, subaccountToBlob(subaccount));
             };
 
         };
@@ -201,7 +179,7 @@ module {
         // Reader
         let icrc_reader = IcrcReader.Reader<system>({
             maxSimultaneousRequests = 40;
-            mem = lmem.reader;
+            xmem = lmem.reader;
             ledger_id;
             start_from_block;
             onError = logErr; // In case a cycle throws an error
@@ -293,7 +271,7 @@ module {
         /// Returns info about ledger library
         public func getInfo() : Info {
             {
-                last_indexed_tx = lmem.reader.last_indexed_tx;
+                last_indexed_tx = icrc_reader.getLastReadTxIndex();
                 accounts = Map.size(lmem.accounts);
                 pending = icrc_sender.getPendingCount();
                 actor_principal = me_can;
@@ -307,7 +285,7 @@ module {
 
         /// Get Iter of all accounts owned by the canister (except dust < fee)
         public func accounts() : Iter.Iter<(Blob, Nat)> {
-            Iter.map<(Blob, AccountMem), (Blob, Nat)>(Map.entries<Blob, AccountMem>(lmem.accounts), func((k, v)) { (k, v.balance - v.in_transit) });
+            Iter.map<(Blob, VM.AccountMem), (Blob, Nat)>(Map.entries<Blob, VM.AccountMem>(lmem.accounts), func((k, v)) { (k, v.balance - v.in_transit) });
         };
 
         /// Returns the fee for sending a transaction

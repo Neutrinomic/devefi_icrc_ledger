@@ -1,5 +1,4 @@
 import BTree "mo:stableheapbtreemap/BTree";
-import Option "mo:base/Option";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
 import Float "mo:base/Float";
@@ -7,19 +6,23 @@ import Ledger "./icrc_ledger";
 import Principal "mo:base/Principal";
 import Vector "mo:vector";
 import Timer "mo:base/Timer";
-import Array "mo:base/Array";
 import Error "mo:base/Error";
 import Blob "mo:base/Blob";
 import Nat64 "mo:base/Nat64";
-import Nat32 "mo:base/Nat32";
 import Time "mo:base/Time";
 import Int "mo:base/Int";
 import Prim "mo:⛔";
 import Nat8 "mo:base/Nat8";
+import Ver1 "./memory/v1";
+import MU "mo:mosup";
 
 module {
 
-
+    public module Mem {
+        public module Sender {
+            public let V1 = Ver1.Sender;
+        }
+    };
 
     public type TransactionInput = {
         amount: Nat;
@@ -27,24 +30,8 @@ module {
         from_subaccount : ?Blob;
     };
 
-    public type Transaction = {
-        amount: Nat;
-        to : Ledger.Account;
-        from_subaccount : ?Blob;
-        var created_at_time : Nat64; // 1000000000
-        memo : Blob;
-        var tries: Nat;
-    };
 
-    public type Mem = {
-        transactions : BTree.BTree<Nat64, Transaction>;
-    };
-
-    public func Mem() : Mem {
-        return {
-            transactions = BTree.init<Nat64, Transaction>(?16);
-        };
-    };
+    let VM = Mem.Sender.V1;
     let MAX_SENT_EACH_CYCLE:Nat = 90;
 
     let RETRY_EVERY_SEC:Float = 120_000_000_000; // 2 minutes
@@ -62,7 +49,7 @@ module {
     };
 
     public class Sender<system>({
-        mem : Mem;
+        xmem : MU.MemShell<VM.Mem>;
         ledger_id: Principal;
         onError: (Text) -> ();
         onConfirmations : ([Nat64]) -> ();
@@ -71,6 +58,7 @@ module {
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
         me_can : Principal;
     }) {
+        let mem = MU.access(xmem);
         let ledger = actor(Principal.toText(ledger_id)) : Ledger.Oneway;
         var getReaderLastTxTime : ?(() -> (Nat64)) = null;
         
@@ -91,7 +79,7 @@ module {
             let now = Int.abs(Time.now());
             let nowU64 = Nat64.fromNat(now);
 
-            let transactions_to_send = BTree.scanLimit<Nat64, Transaction>(mem.transactions, Nat64.compare, 0, ^0, #fwd, 3000);
+            let transactions_to_send = BTree.scanLimit<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, 0, ^0, #fwd, 3000);
 
             let ?gr_fn = getReaderLastTxTime else Debug.trap("Err getReaderLastTxTime not set");
             let lastReaderTxTime = gr_fn();  // This is the last time the reader has seen a transaction or the current time if there are no more transactions
@@ -103,7 +91,7 @@ module {
             var sent_count = 0;
             label vtransactions for ((id, tx) in transactions_to_send.results.vals()) {
                 if (tx.amount < fee) {
-                    ignore BTree.delete<Nat64, Transaction>(mem.transactions, Nat64.compare, id);
+                    ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
                     continue vtransactions;
                 };
 
@@ -172,7 +160,7 @@ module {
                 if (tx_from.owner != me_can) continue tloop;
                 let ?id = DNat64(Blob.toArray(tx_memo)) else continue tloop;
                 
-                ignore BTree.delete<Nat64, Transaction>(mem.transactions, Nat64.compare, id);
+                ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
                 Vector.add<Nat64>(confirmations, id);
             };
             onConfirmations(Vector.toArray(confirmations));
@@ -183,7 +171,7 @@ module {
         };
 
         public func send(id:Nat64, tx: TransactionInput) {
-            let txr : Transaction = {
+            let txr : VM.Transaction = {
                 amount = tx.amount;
                 to = tx.to;
                 from_subaccount = tx.from_subaccount;
@@ -192,7 +180,7 @@ module {
                 var tries = 0;
             };
             
-            ignore BTree.insert<Nat64, Transaction>(mem.transactions, Nat64.compare, id, txr);
+            ignore BTree.insert<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id, txr);
         };
 
  
