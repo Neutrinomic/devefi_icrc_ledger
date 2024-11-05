@@ -36,23 +36,25 @@ actor class({ledgerId: Principal}) = this {
     let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last, Principal.fromActor(this));
     
 
-    let dust = 10000; // leave dust to try the balance of function
 
     ledger.onReceive(func (t) {
 
         if (t.to.subaccount == null) {
             // we will split into 1,000 subaccounts
-            var i = 0;
+            var i = 1;
             label sending loop {
                 let amount = t.amount / 10000; // Each account gets 1/10000
+                Debug.print(">>>" # debug_show(amount));
+
                 ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to.subaccount; });
                 i += 1;
-                if (i >= 1_000) break sending;
+                if (i >= 1_001) break sending;
             }
         } else {
             // if it has subaccount
             // we will pass half to another subaccount
             if (t.amount/10 < ledger.getFee() ) return; // if we send that it will be removed from our balance but won't register
+            Debug.print(debug_show(t.amount/10));
             ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount / 10 ; from_subaccount = t.to.subaccount; });
             next_subaccount_id += 1;
         }

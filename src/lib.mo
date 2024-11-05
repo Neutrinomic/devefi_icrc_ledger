@@ -175,6 +175,17 @@ module {
             };
 
         };
+        
+        let nullSubaccount:Blob = subaccountToBlob(null);
+        // Usually we don't return 32 zeroes but null
+        private func formatSubaccount(s: ?Blob) : ?Blob {
+            switch(s) {
+                case (null) null;
+                case (?s) {
+                    if (s == nullSubaccount) null else ?s;
+                };
+            };
+        };
 
         // Reader
         let icrc_reader = IcrcReader.Reader<system>({
@@ -193,7 +204,7 @@ module {
                     if (not Option.isNull(tx.mint)) {
                         let ?mint = tx.mint else continue txloop;
                         if (mint.to.owner == me_can) {
-                            handle_incoming_amount(mint.to.subaccount, mint.amount);
+                            handle_incoming_amount(formatSubaccount(mint.to.subaccount), mint.amount);
 
                             ignore do ? {
                                 callback_onReceive! (
@@ -213,7 +224,7 @@ module {
                         if (tr.to.owner == me_can) {
                             if (tr.amount >= fee) {
                                 // ignore it since we can't even burn that
-                                handle_incoming_amount(tr.to.subaccount, tr.amount);
+                                handle_incoming_amount(formatSubaccount(tr.to.subaccount), tr.amount);
                                 ignore do ? {
                                     callback_onReceive! ({
                                         tr with
@@ -225,13 +236,13 @@ module {
                         };
 
                         if (tr.from.owner == me_can) {
-                            handle_outgoing_amount(tr.from.subaccount, tr.amount + fee);
+                            handle_outgoing_amount(formatSubaccount(tr.from.subaccount), tr.amount + fee);
                         };
                     };
                     if (not Option.isNull(tx.burn)) {
                         let ?burn = tx.burn else continue txloop;
                         if (burn.from.owner == me_can) {
-                            handle_outgoing_amount(burn.from.subaccount, burn.amount);
+                            handle_outgoing_amount(formatSubaccount(burn.from.subaccount), burn.amount);
                         };
                     };
                 };
@@ -267,6 +278,8 @@ module {
                 },
             );
         };
+
+   
 
         /// Returns info about ledger library
         public func getInfo() : Info {
