@@ -37,7 +37,7 @@ describe('Counter', () => {
       // console.log(`Jo Principal: ${jo.getPrincipal().toText()}`);
       // console.log(`Bob Principal: ${bob.getPrincipal().toText()}`);
 
-      pic = await PocketIc.create({sns:true});
+      pic = await PocketIc.create(process.env.PIC_URL);
   
       // Ledger
       const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), pic.getSnsSubnet()?.id);
@@ -79,10 +79,7 @@ describe('Counter', () => {
       expect(toState(result)).toBe("100000000")
     });
 
-    it(`last_indexed_tx should start at 0`, async () => {
-      const result = await user.get_info();
-      expect(toState(result.last_indexed_tx)).toBe("0");
-    });
+
 
     it(`Check ledger transaction log`  , async () => {
       const result = await ledger.get_transactions({start: 0n, length: 100n});
@@ -91,13 +88,10 @@ describe('Counter', () => {
       
     });
 
-    it(`start and last_indexed_tx should be at 1`, async () => {
+    it(`start and last_indexed_tx should be at 2`, async () => {
    
-      await passTime(1);
-    
-      const result = await user.start();
 
-      await passTime(3);
+      await passTime(4);
       const result2 = await user.get_info();
       expect(toState(result2.last_indexed_tx)).toBe("2");
       

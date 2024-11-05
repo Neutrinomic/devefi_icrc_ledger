@@ -33,7 +33,6 @@ module {
         reader : IcrcReader.Mem;
         sender : IcrcSender.Mem;
         accounts : Map.Map<Blob, AccountMem>;
-        var actor_principal : ?Principal;
         var meta : ?Meta;
         var next_tx_id : Nat64;
     };
@@ -44,7 +43,6 @@ module {
             reader = IcrcReader.Mem();
             sender = IcrcSender.Mem();
             accounts = Map.new<Blob, AccountMem>();
-            var actor_principal = null;
             var meta = null;
             minter = null;
             var next_tx_id : Nat64 = 0;
@@ -62,7 +60,7 @@ module {
         last_indexed_tx : Nat;
         accounts : Nat;
         pending : Nat;
-        actor_principal : ?Principal;
+        actor_principal : Principal;
         sender_instructions_cost : Nat64;
         reader_instructions_cost : Nat64;
         errors : Nat;
@@ -104,7 +102,7 @@ module {
     ///     stable let lmem = L.LMem();
     ///     let ledger = L.Ledger(lmem, "bnz7o-iuaaa-aaaaa-qaaaa-cai", #last);
     /// ```
-    public class Ledger<system>(lmem : Mem, ledger_id_txt : Text, start_from_block : ({ #id : Nat; #last })) {
+    public class Ledger<system>(lmem : Mem, ledger_id_txt : Text, start_from_block : ({ #id : Nat; #last }), me_can : Principal) {
 
         let ledger_id = Principal.fromText(ledger_id_txt);
         let errors = SWB.SlidingWindowBuffer<Text>();
@@ -115,9 +113,12 @@ module {
         var callback_onReceive : ?((Transfer) -> ()) = null;
         var callback_onSent : ?((Nat64) -> ()) = null;
 
-        // Sender
+        private func trap(e:Text) : None {
+            Debug.print("TRAP:" # e);
+            Debug.trap(e);
+        };
 
-        var started : Bool = false;
+        // Sender
 
         private func logErr(e : Text) : () {
             let idx = errors.add(e);
@@ -132,11 +133,11 @@ module {
             m.minter;
         };
 
-        let icrc_sender = IcrcSender.Sender({
+        let icrc_sender = IcrcSender.Sender<system>({
             ledger_id;
             mem = lmem.sender;
             getFee = func() : Nat {
-                let ?m = lmem.meta else Debug.trap("ERR100");
+                let ?m = lmem.meta else trap("ERR100");
                 m.fee;
             };
             onError = logErr; // In case a cycle throws an error
@@ -148,10 +149,13 @@ module {
             };
             getMinter = getMinter;
             onCycleEnd = func(i : Nat64) { sender_instructions_cost := i }; // used to measure how much instructions it takes to send transactions in one cycle
+            me_can;
         });
 
+
+
         public func getMeta() : Meta {
-            let ?m = lmem.meta else Debug.trap("ERR101");
+            let ?m = lmem.meta else trap("ERR101");
             m;
         };
 
@@ -195,7 +199,7 @@ module {
         };
 
         // Reader
-        let icrc_reader = IcrcReader.Reader({
+        let icrc_reader = IcrcReader.Reader<system>({
             maxSimultaneousRequests = 40;
             mem = lmem.reader;
             ledger_id;
@@ -206,13 +210,11 @@ module {
             onRead = func(transactions : [IcrcReader.Transaction], _) {
                 icrc_sender.confirm(transactions);
 
-                let ?meta = lmem.meta else Debug.trap("ERR102"); // Not ready yet;
-                let fee = meta.fee;
-                let ?me = lmem.actor_principal else return;
+
                 label txloop for (tx in transactions.vals()) {
                     if (not Option.isNull(tx.mint)) {
                         let ?mint = tx.mint else continue txloop;
-                        if (mint.to.owner == me) {
+                        if (mint.to.owner == me_can) {
                             handle_incoming_amount(mint.to.subaccount, mint.amount);
 
                             ignore do ? {
@@ -229,8 +231,8 @@ module {
                     };
                     if (not Option.isNull(tx.transfer)) {
                         let ?tr = tx.transfer else continue txloop;
-
-                        if (tr.to.owner == me) {
+                        let ?fee = tr.fee else continue txloop;
+                        if (tr.to.owner == me_can) {
                             if (tr.amount >= fee) {
                                 // ignore it since we can't even burn that
                                 handle_incoming_amount(tr.to.subaccount, tr.amount);
@@ -244,14 +246,14 @@ module {
                             };
                         };
 
-                        if (tr.from.owner == me) {
+                        if (tr.from.owner == me_can) {
                             handle_outgoing_amount(tr.from.subaccount, tr.amount + fee);
                         };
                     };
                     if (not Option.isNull(tx.burn)) {
                         let ?burn = tx.burn else continue txloop;
-                        if (burn.from.owner == me) {
-                            handle_outgoing_amount(burn.from.subaccount, burn.amount + fee);
+                        if (burn.from.owner == me_can) {
+                            handle_outgoing_amount(burn.from.subaccount, burn.amount);
                         };
                     };
                 };
@@ -260,63 +262,20 @@ module {
 
         icrc_sender.setGetReaderLastTxTime(icrc_reader.getReaderLastTxTime);
 
-        /// Set the actor principal. If `start` has been called before, it will really start the ledger.
-        public func setOwner(me : Principal) : () {
-            lmem.actor_principal := ?me;
-        };
-
-        private func refreshFee() : async () {
-            try {
-                let ?{ fee; decimals; symbol; minter } = lmem.meta else do {
-                    logErr("ERR104"); // Internal error - in the strange case when we have this function called but the meta is not set
-                    return;
-                };
-                let ledger = actor (Principal.toText(ledger_id)) : ICRCLedger.Self;
-                let newfee = await ledger.icrc1_fee();
-                lmem.meta := ?{ decimals; symbol; minter; fee = newfee };
-            } catch (e) {};
-        };
-
-        // will loop until the actor_principal is set
-        private func delayed_start() : async () {
-            if (Option.isNull(lmem.meta)) await retrieveMeta();
-
-            if (not Option.isNull(lmem.actor_principal) and not Option.isNull(lmem.meta)) {
-                realStart<system>();
-                ignore Timer.recurringTimer<system>(#seconds 3600, refreshFee); // every hour
-
-            } else {
-                ignore Timer.setTimer<system>(#seconds 3, delayed_start);
-            };
-        };
-
         /// Start the ledger timers
 
         private func retrieveMeta() : async () {
-            try {
-                let ledger = actor (Principal.toText(ledger_id)) : ICRCLedger.Self;
-                let symbol = await ledger.icrc1_symbol();
-                let decimals = await ledger.icrc1_decimals();
-                let minter = await ledger.icrc1_minting_account();
-                let fee = await ledger.icrc1_fee();
-                lmem.meta := ?{ symbol; decimals; minter; fee };
-            } catch (e) {} // if not cought it will stop the recurring timer
-        };
-
-        /// Really starts the ledger and the whole system
-        private func realStart<system>() {
-            let ?me = lmem.actor_principal else Debug.trap("no actor principal");
-            Debug.print(debug_show (me));
-            if (started) Debug.trap("already started");
-            started := true;
-            icrc_sender.start<system>(?me); // We can't call start from the constructor because this is not defined yet
-            icrc_reader.start<system>();
+            let ledger = actor (Principal.toText(ledger_id)) : ICRCLedger.Self;
+            let symbol = await ledger.icrc1_symbol();
+            let decimals = await ledger.icrc1_decimals();
+            let minter = await ledger.icrc1_minting_account();
+            let fee = await ledger.icrc1_fee();
+            lmem.meta := ?{ symbol; decimals; minter; fee };
         };
 
         /// Returns the actor principal
         public func me() : Principal {
-            let ?me = lmem.actor_principal else Debug.trap("no actor principal");
-            me;
+            me_can
         };
 
         /// Returns the errors that happened
@@ -325,7 +284,7 @@ module {
             Array.tabulate<Text>(
                 errors.len(),
                 func(i : Nat) {
-                    let ?x = errors.getOpt(start + i) else Debug.trap("memory corruption");
+                    let ?x = errors.getOpt(start + i) else trap("memory corruption");
                     x;
                 },
             );
@@ -337,7 +296,7 @@ module {
                 last_indexed_tx = lmem.reader.last_indexed_tx;
                 accounts = Map.size(lmem.accounts);
                 pending = icrc_sender.getPendingCount();
-                actor_principal = lmem.actor_principal;
+                actor_principal = me_can;
                 sent = lmem.next_tx_id;
                 reader_instructions_cost;
                 sender_instructions_cost;
@@ -353,7 +312,7 @@ module {
 
         /// Returns the fee for sending a transaction
         public func getFee() : Nat {
-            let ?m = lmem.meta else Debug.trap("ERR103");
+            let ?m = lmem.meta else trap("ERR103");
             m.fee;
         };
 
@@ -418,7 +377,10 @@ module {
             icrc_sender.isSent(id);
         };
 
-        ignore Timer.setTimer<system>(#seconds 0, delayed_start);
+        
+        ignore Timer.setTimer<system>(#seconds 0, retrieveMeta); // every minute
+        ignore Timer.recurringTimer<system>(#seconds 3600, retrieveMeta); // every hour
+
 
     };
 

@@ -12,7 +12,7 @@ import Debug "mo:base/Debug";
 
 actor class({ledgerId: Principal}) = this {
 
-
+    
     private func test_subaccount(n:Nat64) : ?Blob {
         ?Blob.fromArray(Iter.toArray(I.pad<Nat8>( Iter.fromArray(ENat64(n)), 32, 0 : Nat8)));
     };
@@ -30,11 +30,10 @@ actor class({ledgerId: Principal}) = this {
         ];
     };
 
-
     var next_subaccount_id:Nat64 = 100000;
 
     stable let lmem = L.LMem();
-    let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last);
+    let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last, Principal.fromActor(this));
     
 
     let dust = 10000; // leave dust to try the balance of function
@@ -61,10 +60,7 @@ actor class({ledgerId: Principal}) = this {
     
     //---
 
-    public func start() {
-        Debug.print("started");
-        ledger.setOwner(Principal.fromActor(this));
-        };
+
 
     public query func get_balance(s: ?Blob) : async Nat {
         ledger.balance(s)

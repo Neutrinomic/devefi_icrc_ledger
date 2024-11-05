@@ -38,13 +38,11 @@ module {
 
     public type Mem = {
         transactions : BTree.BTree<Nat64, Transaction>;
-        var stored_owner : ?Principal;
     };
 
     public func Mem() : Mem {
         return {
             transactions = BTree.init<Nat64, Transaction>(?16);
-            var stored_owner = null;
         };
     };
     let MAX_SENT_EACH_CYCLE:Nat = 90;
@@ -63,7 +61,7 @@ module {
         return window_idx * retryWindow;
     };
 
-    public class Sender({
+    public class Sender<system>({
         mem : Mem;
         ledger_id: Principal;
         onError: (Text) -> ();
@@ -71,8 +69,8 @@ module {
         getFee : () -> Nat;
         getMinter : () -> (?Ledger.Account);
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
+        me_can : Principal;
     }) {
-        var started = false;
         let ledger = actor(Principal.toText(ledger_id)) : Ledger.Oneway;
         var getReaderLastTxTime : ?(() -> (Nat64)) = null;
         
@@ -86,8 +84,6 @@ module {
         };
 
         private func cycle<system>() : async () {
-            let ?owner = mem.stored_owner else return;
-            if (not started) return;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
             let fee = getFee();
@@ -106,7 +102,6 @@ module {
             };
             var sent_count = 0;
             label vtransactions for ((id, tx) in transactions_to_send.results.vals()) {
-                
                 if (tx.amount < fee) {
                     ignore BTree.delete<Nat64, Transaction>(mem.transactions, Nat64.compare, id);
                     continue vtransactions;
@@ -169,13 +164,12 @@ module {
             // If our canister is the minter address, tx will appear as mint
             // otherwise they will be transfer txs
             // All need to be confirmed
-            let ?owner = mem.stored_owner else return;
 
             let confirmations = Vector.new<Nat64>();
             label tloop for (tx in txs.vals()) { 
                 
                 let ?(tx_from, tx_memo) = getTxMemoFrom(tx) else continue tloop;
-                if (tx_from.owner != owner) continue tloop;
+                if (tx_from.owner != me_can) continue tloop;
                 let ?id = DNat64(Blob.toArray(tx_memo)) else continue tloop;
                 
                 ignore BTree.delete<Nat64, Transaction>(mem.transactions, Nat64.compare, id);
@@ -201,18 +195,7 @@ module {
             ignore BTree.insert<Nat64, Transaction>(mem.transactions, Nat64.compare, id, txr);
         };
 
-        public func start<system>(owner:?Principal) {
-            if (not Option.isNull(owner)) mem.stored_owner := owner;
-            if (Option.isNull(mem.stored_owner)) return;
-
-            if (started) Debug.trap("already started");
-            started := true;
-            ignore Timer.recurringTimer<system>(#seconds 2, cycle);
-        };
-
-        public func stop() {
-            started := false;
-        };
+ 
 
         public func ENat64(value : Nat64) : [Nat8] {
             return [
@@ -231,6 +214,8 @@ module {
             if (array.size() != 8) return null;
             return ?(Nat64.fromNat(Nat8.toNat(array[0])) << 56 | Nat64.fromNat(Nat8.toNat(array[1])) << 48 | Nat64.fromNat(Nat8.toNat(array[2])) << 40 | Nat64.fromNat(Nat8.toNat(array[3])) << 32 | Nat64.fromNat(Nat8.toNat(array[4])) << 24 | Nat64.fromNat(Nat8.toNat(array[5])) << 16 | Nat64.fromNat(Nat8.toNat(array[6])) << 8 | Nat64.fromNat(Nat8.toNat(array[7])));
         };
+
+        ignore Timer.recurringTimer<system>(#seconds 2, cycle);
     };
 
 };

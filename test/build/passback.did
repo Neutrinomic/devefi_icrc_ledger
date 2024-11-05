@@ -9,7 +9,6 @@ type _anon_class_13_1 =
    get_balance: (opt blob) -> (nat) query;
    get_errors: () -> (vec text) query;
    get_info: () -> (Info) query;
-   start: () -> () oneway;
    ver: () -> (nat) query;
  };
 type Meta = 
@@ -22,7 +21,7 @@ type Meta =
 type Info = 
  record {
    accounts: nat;
-   actor_principal: opt principal;
+   actor_principal: principal;
    errors: nat;
    lastTxTime: nat64;
    last_indexed_tx: nat;

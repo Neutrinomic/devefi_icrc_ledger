@@ -1,7 +1,0 @@
-type anon_class_15_1 = 
- service {
-   get_errors: () -> (nat, nat, text) query;
-   start: () -> ();
-   stop: () -> ();
- };
-service : (record {userCanId: principal;}) -> anon_class_15_1

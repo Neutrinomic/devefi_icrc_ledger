@@ -12,8 +12,10 @@ import Debug "mo:base/Debug";
 
 actor class({ledgerId: Principal}) = this {
 
+
+
     stable let lmem = L.LMem();
-    let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last);
+    let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last, Principal.fromActor(this));
     
     ledger.onReceive(func (t) {
         switch(t.from) {
@@ -25,12 +27,7 @@ actor class({ledgerId: Principal}) = this {
         
     });
 
-    
     //---
-
-    public func start() {
-        ledger.setOwner(Principal.fromActor(this));
-        };
 
     public query func get_balance(s: ?Blob) : async Nat {
         ledger.balance(s)

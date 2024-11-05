@@ -12,7 +12,7 @@ export interface Info {
   'errors' : bigint,
   'lastTxTime' : bigint,
   'accounts' : bigint,
-  'actor_principal' : [] | [Principal],
+  'actor_principal' : Principal,
   'reader_instructions_cost' : bigint,
   'sender_instructions_cost' : bigint,
 }
@@ -29,7 +29,6 @@ export interface _anon_class_13_1 {
   'get_balance' : ActorMethod<[[] | [Uint8Array | number[]]], bigint>,
   'get_errors' : ActorMethod<[], Array<string>>,
   'get_info' : ActorMethod<[], Info>,
-  'start' : ActorMethod<[], undefined>,
   'ver' : ActorMethod<[], bigint>,
 }
 export interface _SERVICE extends _anon_class_13_1 {}

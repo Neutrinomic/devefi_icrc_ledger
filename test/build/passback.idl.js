@@ -15,7 +15,7 @@ export const idlFactory = ({ IDL }) => {
     'errors' : IDL.Nat,
     'lastTxTime' : IDL.Nat64,
     'accounts' : IDL.Nat,
-    'actor_principal' : IDL.Opt(IDL.Principal),
+    'actor_principal' : IDL.Principal,
     'reader_instructions_cost' : IDL.Nat64,
     'sender_instructions_cost' : IDL.Nat64,
   });
@@ -34,7 +34,6 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_errors' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'get_info' : IDL.Func([], [Info], ['query']),
-    'start' : IDL.Func([], [], ['oneway']),
     'ver' : IDL.Func([], [IDL.Nat], ['query']),
   });
   return _anon_class_13_1;

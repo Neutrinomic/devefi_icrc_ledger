@@ -31,7 +31,7 @@ module {
             };
         };
 
-    public class Reader({
+    public class Reader<system>({
         mem : Mem;
         ledger_id : Principal;
         start_from_block: {#id:Nat; #last};
@@ -40,7 +40,6 @@ module {
         onRead : ([Ledger.Transaction], Nat) -> ();
         maxSimultaneousRequests : Nat;
     }) {
-        var started = false;
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
         var lastTxTime : Nat64 = 0;
 
@@ -50,8 +49,7 @@ module {
         let MAX_TIME_LOCKED:Int = 120_000_000_000; // 120 seconds
 
         private func cycle() : async () {
-            if (not started) return;
-
+            
             let now = Time.now();
             if (now - lock < MAX_TIME_LOCKED) return;
             lock := now;
@@ -83,7 +81,6 @@ module {
                     return;
             };
             if (query_start != mem.last_indexed_tx) {lock:=0; return;};
-
             if (rez.archived_transactions.size() == 0) {
                 // We can just process the transactions that are inside the ledger and not inside archive
                 onRead(rez.transactions, mem.last_indexed_tx);
@@ -181,15 +178,8 @@ module {
             lastTxTime;
         };
 
-        public func start<system>() {
-            if (started) Debug.trap("already started");
-            started := true;
-            ignore Timer.recurringTimer<system>(#seconds 2, cycle);
-        };
-
-        public func stop() {
-            started := false;
-        }
+        ignore Timer.setTimer<system>(#seconds 0, cycle);
+        ignore Timer.recurringTimer<system>(#seconds 2, cycle);
     };
 
 };

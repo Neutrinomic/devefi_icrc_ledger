@@ -23,7 +23,7 @@ export async function TestCan(pic: PocketIc, ledgerCanisterId: Principal) {
 };
 
 
-describe('Counter', () => {
+describe('Passback', () => {
   let pic: PocketIc;
   let user: Actor<TestService>;
   let ledger: Actor<ICRCLedgerService>;
@@ -35,7 +35,7 @@ describe('Counter', () => {
 
   beforeAll(async () => {
 
-    pic = await PocketIc.create({ sns: true });
+    pic = await PocketIc.create(process.env.PIC_URL);
     // Ledger
     const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), pic.getSnsSubnet()?.id);
     ledger = ledgerfixture.actor;
@@ -45,6 +45,7 @@ describe('Counter', () => {
     const fixture = await TestCan(pic, ledgerCanisterId);
     user = fixture.actor;
     userCanisterId = fixture.canisterId;
+
   });
 
   afterAll(async () => {
@@ -78,20 +79,19 @@ describe('Counter', () => {
 
   it(`Start passback`, async () => {
 
-    await passTime(2);
-
-    await user.start();
-
-    await passTime(6);
+    await passTime(3);
+    let real = await ledger.get_transactions({ start : 0n, length : 0n });
 
     const result2 = await user.get_info();
 
-    expect(toState(result2.last_indexed_tx)).toBe("2");
+    expect(result2.last_indexed_tx).toBe(real.log_length);
 
   });
 
   it(`Bob sends to passback`, async () => {
     ledger.setIdentity(bob);
+
+
     const result = await ledger.icrc1_transfer({
       to: { owner: userCanisterId, subaccount: [] },
       from_subaccount: [],
@@ -110,7 +110,8 @@ describe('Counter', () => {
 
 
   it(`Check Bob balance after passback reacts`, async () => {
-    await passTime(3);
+    await passTime(5);
+
     const result = await ledger.icrc1_balance_of({ owner: bob.getPrincipal(), subaccount: [] });
     expect(toState(result)).toBe("99980000")
   });
