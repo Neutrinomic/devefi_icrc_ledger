@@ -59,30 +59,6 @@ Hooks must not trap because Motoko is unable to catch synchronous errors. In the
 When a transaction is enqueued, its amount is deducted from the balance. This process involves maintaining two figures: balance, which represents the actual balance, and in_transit, which tracks the amount being dispatched through outgoing transactions. This mechanism prevents the system from initiating multiple transactions without sufficient balance.
 
 
-### Test - 1 - Dynamic Ledger Endurance Analysis
-
-#### Methodology
-We executed tests on a locally deployed ledger canister, specifically the latest one from the SNSW. The testing process involved receiving a large volume of tokens and dividing these by sending 10,000 transactions to various accounts. These recipient accounts then forwarded the transactions to other accounts until the transaction amount fell below the transaction fee. This strategy allowed us to initiate with sufficient tokens for 20,000 transactions and assess the total number of transactions successfully processed at the end of the test.
-
-Throughout the testing phase, we frequently stopped and restarted both the test canister equipped with this library and the ledger itself. Additionally, we performed several upgrades to the test canister during the testing period. Despite these interruptions, our trials consistently showed that no transactions were lost, whether in the sending or receiving phases.
-
-We further tested the system's resilience by intentionally causing the replica to generate errors during the sending process. These induced errors did not disrupt the queue's functionality.
-
-#### Important Notice
-This testing was conducted exclusively with Dfinity's icrc ledger, excluding the ICP ledger due to its distinct transaction log structure. It is important to note that the performance and reliability observed may not directly translate to other ledgers. The functionality of this library is contingent upon two key features: deduplication and the get_transactions method, which are slated for replacement with the upcoming ICRC-3 protocol. For optimal performance, both features must operate flawlessly.
-
-#### Throughput Per Ledger
-Sending to Library Queue: Limited only by canister memory and instruction limits.
-Sending from Queue to Ledger: ~45 tx/s (could be double if both canisters are on the same subnet or tested in local replica)
-Reading from Ledger: ~250 tx/s
-
-### Test - 2 - Integrity Verification Protocol
-
-#### Methodology
-
-Execute 20,000 transactions (the ledger is configured to split the archive after every 10,000 transactions). Obtain a hash from all account balances owned by the canister. Reinstall the canister and start from block 0 (removing hooks). Generate a second hash and compare it to the first; the two hashes should match. Additionally, retrieve all accounts using the new accounts function and directly check their balances by calling the ledger. Compare both sets of balances to ensure they match. The library has passed this test multiple times.
-
-
 ## Usage
 Ignores transactions with amount less than fee and won't show them in onRecieve or keep their balance.
 
@@ -93,28 +69,14 @@ import Principal "mo:base/Principal";
 
 actor class() = this {
 
-    stable let lmem = L.LMem(); // has to be stable
+    stable let lmem = L.Mem.Ledger.V1.new(); // has to be stable
     
-    let ledger = L.Ledger(lmem, "mxzaz-hqaaa-aaaar-qaada-cai", #last);
+    let ledger = L.Ledger(lmem, "mxzaz-hqaaa-aaaar-qaada-cai", #last, Principal.fromActor(this));
 
-    ledger.onReceive(func (t) = ignore ledger.send({ to = t.from; amount = t.amount; from_subaccount = t.to.subaccount; }));
+    ledger.onReceive(func (t) {
+        // tx event
+    });
     
-    // there are also onMint, onSent (from this canister), onBurn
-
-    ledger.start();
-    
-    public shared({caller}) func start() { 
-         assert(Principal.isController(caller));
-         ledger.setOwner(this); // required to be called once when canister is installed
-         };
-
-    public query func getErrors() : async [Text] { 
-        ledger.getErrors(); // When running timers, if there is an error it will show here and nowhere else. (Hooks are called by timers too)
-    };
-
-    public query func getInfo() : async L.Info {
-        ledger.getInfo();
-    }
 }
 
 ```
