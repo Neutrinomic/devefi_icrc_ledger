@@ -60,11 +60,11 @@ module {
     }) {
         let mem = MU.access(xmem);
         let ledger = actor(Principal.toText(ledger_id)) : Ledger.Oneway;
-        var getReaderLastTxTime : ?(() -> (Nat64)) = null;
+        var getReaderLastUpdate : ?(() -> (Nat64)) = null;
         
 
-        public func setGetReaderLastTxTime(fn : () -> (Nat64)) {
-            getReaderLastTxTime := ?fn;
+        public func setGetReaderLastUpdate(fn : () -> (Nat64)) {
+            getReaderLastUpdate := ?fn;
         };
 
         public func isSent(id:Nat64) : Bool {
@@ -81,7 +81,7 @@ module {
 
             let transactions_to_send = BTree.scanLimit<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, 0, ^0, #fwd, 3000);
 
-            let ?gr_fn = getReaderLastTxTime else Debug.trap("Err getReaderLastTxTime not set");
+            let ?gr_fn = getReaderLastUpdate else Debug.trap("Err getReaderLastUpdate not set");
             let lastReaderTxTime = gr_fn();  // This is the last time the reader has seen a transaction or the current time if there are no more transactions
 
             if (lastReaderTxTime != 0 and lastReaderTxTime < nowU64 - maxReaderLag) {

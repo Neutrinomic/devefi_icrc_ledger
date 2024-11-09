@@ -249,7 +249,7 @@ module {
             };
         });
 
-        icrc_sender.setGetReaderLastTxTime(icrc_reader.getReaderLastTxTime);
+        icrc_sender.setGetReaderLastUpdate(icrc_reader.getReaderLastUpdate);
 
         /// Start the ledger timers
 
