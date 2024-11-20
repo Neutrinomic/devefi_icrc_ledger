@@ -258,8 +258,9 @@ module {
             let symbol = await ledger.icrc1_symbol();
             let decimals = await ledger.icrc1_decimals();
             let minter = await ledger.icrc1_minting_account();
+            let name = await ledger.icrc1_name();
             let fee = await ledger.icrc1_fee();
-            lmem.meta := ?{ symbol; decimals; minter; fee };
+            lmem.meta := ?{ symbol; decimals; minter; fee; name };
         };
 
         /// Returns the actor principal
@@ -369,7 +370,7 @@ module {
         };
 
         
-        ignore Timer.setTimer<system>(#seconds 0, retrieveMeta); // every minute
+        ignore Timer.setTimer<system>(#seconds 0, retrieveMeta);
         ignore Timer.recurringTimer<system>(#seconds 3600, retrieveMeta); // every hour
 
 
