@@ -32,6 +32,7 @@ module {
 
     let VM = Mem.Ledger.V1;
 
+    public type Meta = VM.Meta;
 
     public func subaccountToBlob(s : ?Blob) : Blob {
         let ?a = s else return Blob.fromArray([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
