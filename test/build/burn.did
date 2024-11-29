@@ -1,4 +1,4 @@
-type _anon_class_13_1 = 
+type _anon_class_14_1 = 
  service {
    accounts: () -> (vec record {
                           blob;
@@ -9,13 +9,20 @@ type _anon_class_13_1 =
    get_balance: (opt blob) -> (nat) query;
    get_errors: () -> (vec text) query;
    get_info: () -> (Info) query;
+   send_to: (Account, nat) -> (R);
    ver: () -> (nat) query;
+ };
+type SendError = variant {InsufficientFunds;};
+type R = 
+ variant {
+   err: SendError;
+   ok: nat64;
  };
 type Meta = 
  record {
    decimals: nat8;
    fee: nat;
-   minter: opt Account;
+   minter: opt Account__1;
    name: text;
    symbol: text;
  };
@@ -30,9 +37,14 @@ type Info =
    reader_instructions_cost: nat64;
    sender_instructions_cost: nat64;
  };
+type Account__1 = 
+ record {
+   owner: principal;
+   subaccount: opt blob;
+ };
 type Account = 
  record {
    owner: principal;
    subaccount: opt blob;
  };
-service : (record {ledgerId: principal;}) -> _anon_class_13_1
+service : (record {ledgerId: principal;}) -> _anon_class_14_1

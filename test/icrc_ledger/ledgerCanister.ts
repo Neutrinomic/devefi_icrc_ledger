@@ -20,7 +20,7 @@ export async function ICRCLedger(pic: PocketIc, me:Principal, subnet:Principal |
             token_symbol: "tCOIN",
             token_name: "Test Coin",
             metadata: [],
-            initial_balances: [[{ owner: me, subaccount:[] }, 100000000000n]],
+            initial_balances: [], //[{ owner: me, subaccount:[] }, 100000000000n]
             archive_options: {
                 num_blocks_to_archive: 10000n,
                 trigger_threshold: 9000n,

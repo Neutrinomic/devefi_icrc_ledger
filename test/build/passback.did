@@ -16,6 +16,7 @@ type Meta =
    decimals: nat8;
    fee: nat;
    minter: opt Account;
+   name: text;
    symbol: text;
  };
 type Info = 

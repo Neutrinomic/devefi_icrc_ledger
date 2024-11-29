@@ -19,6 +19,7 @@ export interface Info {
 export interface Meta {
   'fee' : bigint,
   'decimals' : number,
+  'name' : string,
   'minter' : [] | [Account],
   'symbol' : string,
 }

@@ -6,6 +6,7 @@ export const idlFactory = ({ IDL }) => {
   const Meta = IDL.Record({
     'fee' : IDL.Nat,
     'decimals' : IDL.Nat8,
+    'name' : IDL.Text,
     'minter' : IDL.Opt(Account),
     'symbol' : IDL.Text,
   });
