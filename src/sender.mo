@@ -78,7 +78,7 @@ module {
 
             let now = Int.abs(Time.now());
             let nowU64 = Nat64.fromNat(now);
-
+            let minter = getMinter();
             let transactions_to_send = BTree.scanLimit<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, 0, ^0, #fwd, 3000);
 
             let ?gr_fn = getReaderLastUpdate else Debug.trap("Err getReaderLastUpdate not set");
@@ -103,14 +103,27 @@ module {
 
                 try {
                     // Relies on transaction deduplication https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-1/README.md
-                    ledger.icrc1_transfer({
-                        amount = tx.amount - fee;
-                        to = tx.to;
-                        from_subaccount = tx.from_subaccount;
-                        created_at_time = ?created_at_adjusted;
-                        memo = ?tx.memo;
-                        fee = ?fee;
-                    });
+                    if (?tx.to == minter) {
+                        // Burn
+                        ledger.icrc1_transfer({
+                            amount = tx.amount;
+                            to = tx.to;
+                            from_subaccount = tx.from_subaccount;
+                            created_at_time = ?created_at_adjusted;
+                            memo = ?tx.memo;
+                            fee = ?0;
+                        });
+                    } else {
+                        // Transfer
+                        ledger.icrc1_transfer({
+                            amount = tx.amount - fee;
+                            to = tx.to;
+                            from_subaccount = tx.from_subaccount;
+                            created_at_time = ?created_at_adjusted;
+                            memo = ?tx.memo;
+                            fee = ?fee;
+                        });
+                    };
                     sent_count += 1;
                     tx.tries := Int.abs(time_for_try);
                 } catch (e) { 

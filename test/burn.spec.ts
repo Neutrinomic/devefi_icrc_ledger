@@ -127,6 +127,28 @@ describe('burn', () => {
       
     });
 
+
+    it(`Burn tx`, async () => {
+      let resp = await user.send_to(
+        {owner: jo.getPrincipal(), subaccount:[]},
+        1_0000_0000n
+      );
+
+      await passTime(40);
+
+
+      expect(toState(resp).ok).toBe("1");
+    });
+
+ 
+    it(`Check info`, async () => {
+
+      let resp = await user.get_info();
+      expect(resp.pending).toBe(0n);
+      
+    });
+
+
     it('Check if error log is empty', async () => {
       let errs = await user.get_errors();
       expect(toState(errs)).toStrictEqual([]);
