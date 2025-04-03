@@ -107,6 +107,7 @@ module {
             };
         };
 
+
         public func getMinter() : (?ICRCLedger.Account) {
             let ?m = lmem.meta else return null;
             m.minter;

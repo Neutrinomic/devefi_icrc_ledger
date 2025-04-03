@@ -62,7 +62,7 @@ module {
                         mem.last_indexed_tx := id;
                     };
                     case (#last) {
-                        let rez = await ledger.get_transactions({
+                        let rez = await (with timeout = 20) ledger.get_transactions({
                             start = 0;
                             length = 0;
                         });
@@ -72,7 +72,7 @@ module {
             };
             let query_start = mem.last_indexed_tx;
             let rez = try {
-                await ledger.get_transactions({
+                await (with timeout = 20) ledger.get_transactions({
                 start = query_start;
                 length = maxTransactionsInCall * maxSimultaneousRequests;
             });
@@ -105,7 +105,7 @@ module {
                     var data = List.nil<Ledger.TransactionRange>();
                     for (arg in args.vals()) {
                         // The calls are sent here without awaiting anything
-                        let promise = atx.callback(arg);
+                        let promise = (with timeout = 20) atx.callback(arg);
                         buf := List.push(promise, buf); 
                     };
                     for (promise in List.toIter(buf)) {

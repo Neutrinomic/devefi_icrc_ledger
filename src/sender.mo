@@ -105,7 +105,7 @@ module {
                     // Relies on transaction deduplication https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-1/README.md
                     if (?tx.to == minter) {
                         // Burn
-                        ledger.icrc1_transfer({
+                        (with timeout = 20) ledger.icrc1_transfer({
                             amount = tx.amount;
                             to = tx.to;
                             from_subaccount = tx.from_subaccount;
@@ -115,7 +115,7 @@ module {
                         });
                     } else {
                         // Transfer
-                        ledger.icrc1_transfer({
+                        (with timeout = 20) ledger.icrc1_transfer({
                             amount = tx.amount - fee;
                             to = tx.to;
                             from_subaccount = tx.from_subaccount;
