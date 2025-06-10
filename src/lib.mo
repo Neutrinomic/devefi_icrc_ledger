@@ -160,7 +160,9 @@ module {
 
         private func handle_outgoing_amount(subaccount : ?Blob, amount : Nat) : () {
             let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(subaccount)) else return;
-            acc.balance -= amount : Nat;
+
+                acc.balance -= amount : Nat;
+            
 
             // When replaying the ledger we don't have in_transit and it results in natural substraction underflow.
             // since in_transit is local and added when sending
@@ -331,9 +333,17 @@ module {
         /// You can send tens of thousands of transactions in one update call. It just adds them to a BTree
         public func send(tr : IcrcSender.TransactionInput) : R<Nat64, SendError> {
             // The amount we send includes the fee. meaning recepient will get the amount - fee
-            let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(tr.from_subaccount)) else return #err(#InsufficientFunds);
-            if (acc.balance : Nat - acc.in_transit : Nat < tr.amount) return #err(#InsufficientFunds);
-            acc.in_transit += tr.amount;
+
+            // Check if from is the minter, if so we don't need to check balance and track in transit
+            let ?m = lmem.meta else trap("ERR104");
+            let ?minter = m.minter else trap("ERR105");
+
+            if (not ((me_can == minter.owner) and (tr.from_subaccount == minter.subaccount))) {
+                let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(tr.from_subaccount)) else return #err(#InsufficientFunds);
+                if (acc.balance : Nat - acc.in_transit : Nat < tr.amount) return #err(#InsufficientFunds);
+                acc.in_transit += tr.amount;   
+            };
+            
             let id = lmem.next_tx_id;
             lmem.next_tx_id += 1;
             icrc_sender.send(id, tr);
