@@ -6,10 +6,10 @@ type _anon_class_14_1 =
                         }) query;
    getMeta: () -> (Meta) query;
    getPending: () -> (nat) query;
-   get_balance: (opt blob) -> (nat) query;
+   get_balance: (s: opt blob) -> (nat) query;
    get_errors: () -> (vec text) query;
    get_info: () -> (Info) query;
-   send_to: (Account, nat) -> (R);
+   send_to: (to: Account, amount: nat) -> (R);
    ver: () -> (nat) query;
  };
 type SendError = variant {InsufficientFunds;};
@@ -22,7 +22,7 @@ type Meta =
  record {
    decimals: nat8;
    fee: nat;
-   minter: opt Account__1;
+   minter: opt Account;
    name: text;
    symbol: text;
  };
@@ -36,11 +36,6 @@ type Info =
    pending: nat;
    reader_instructions_cost: nat64;
    sender_instructions_cost: nat64;
- };
-type Account__1 = 
- record {
-   owner: principal;
-   subaccount: opt blob;
  };
 type Account = 
  record {

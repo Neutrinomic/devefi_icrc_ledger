@@ -52,7 +52,7 @@ module {
         xmem : MU.MemShell<VM.Mem>;
         ledger_id: Principal;
         onError: (Text) -> ();
-        onConfirmations : ([Nat64]) -> ();
+        onConfirmations : ([(Nat64, Nat)]) -> ();
         getFee : () -> Nat;
         getMinter : () -> (?Ledger.Account);
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
@@ -90,7 +90,7 @@ module {
             };
             var sent_count = 0;
             label vtransactions for ((id, tx) in transactions_to_send.results.vals()) {
-                if (tx.amount < fee) {
+                if (tx.amount <= fee) {
                     ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
                     continue vtransactions;
                 };
@@ -160,21 +160,21 @@ module {
             null;
         };
 
-        public func confirm(txs: [Ledger.Transaction]) {
+        public func confirm(txs: [Ledger.Transaction], start_id: Nat) {
             // If our canister sends to a burn address it will be a burn tx.
             // If our canister is the minter address, tx will appear as mint
             // otherwise they will be transfer txs
             // All need to be confirmed
 
-            let confirmations = Vector.new<Nat64>();
-            label tloop for (tx in txs.vals()) { 
-                
+            let confirmations = Vector.new<(Nat64, Nat)>();
+            label tloop for (idx in txs.keys()) { 
+                let tx=txs[idx];
                 let ?(tx_from, tx_memo) = getTxMemoFrom(tx) else continue tloop;
                 if (tx_from.owner != me_can) continue tloop;
                 let ?id = DNat64(Blob.toArray(tx_memo)) else continue tloop;
                 
                 ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
-                Vector.add<Nat64>(confirmations, id);
+                Vector.add<(Nat64, Nat)>(confirmations, (id, start_id + idx));
             };
             onConfirmations(Vector.toArray(confirmations));
         };

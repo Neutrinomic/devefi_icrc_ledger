@@ -1,16 +1,18 @@
 {
   "devDependencies": {
-    "@hadronous/pic": "^0.8.1",
     "@types/jest": "^29.5.14"
   },
   "license": "MIT",
   "scripts": {
-    "test": "./build.sh && jest -c ./jest.config.ts"
+    "test": "./build.sh && jest -c ./jest.config.ts",
+    "test-motoko": "./build.sh && LEDGER=motoko jest -c ./jest.config.ts",
+    "testw": "jest -c ./jest.config.ts"
   },
   "dependencies": {
     "@dfinity/agent": "^1.0.0",
     "@dfinity/candid": "^1.0.0",
     "@dfinity/identity": "^1.0.0",
+    "@dfinity/pic": "^0.13.1",
     "@dfinity/principal": "^1.0.0",
     "@infu/icblast": "^2.0.46",
     "@types/node": "^22.9.0",

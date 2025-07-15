@@ -20,9 +20,7 @@ export const idlFactory = ({ IDL }) => {
     'reader_instructions_cost' : IDL.Nat64,
     'sender_instructions_cost' : IDL.Nat64,
   });
-  const SendError = IDL.Variant({ 'InsufficientFunds' : IDL.Null });
-  const R = IDL.Variant({ 'ok' : IDL.Nat64, 'err' : SendError });
-  const _anon_class_14_1 = IDL.Service({
+  const _anon_class_13_1 = IDL.Service({
     'accounts' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
@@ -37,10 +35,9 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_errors' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'get_info' : IDL.Func([], [Info], ['query']),
-    'send_to' : IDL.Func([Account, IDL.Nat], [R], []),
     'ver' : IDL.Func([], [IDL.Nat], ['query']),
   });
-  return _anon_class_14_1;
+  return _anon_class_13_1;
 };
 export const init = ({ IDL }) => {
   return [IDL.Record({ 'ledgerId' : IDL.Principal })];

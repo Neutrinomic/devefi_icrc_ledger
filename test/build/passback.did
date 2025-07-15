@@ -6,7 +6,7 @@ type _anon_class_13_1 =
                         }) query;
    getMeta: () -> (Meta) query;
    getPending: () -> (nat) query;
-   get_balance: (opt blob) -> (nat) query;
+   get_balance: (s: opt blob) -> (nat) query;
    get_errors: () -> (vec text) query;
    get_info: () -> (Info) query;
    ver: () -> (nat) query;

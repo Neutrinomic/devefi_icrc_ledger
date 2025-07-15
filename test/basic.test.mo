@@ -30,10 +30,10 @@ actor class({ledgerId: Principal}) = this {
         ];
     };
 
-    var next_subaccount_id:Nat64 = 100000;
+    stable var next_subaccount_id:Nat64 = 100000;
 
     stable let lmem = L.Mem.Ledger.V1.new();
-    let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #last, Principal.fromActor(this));
+    let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #id(0), Principal.fromActor(this));
     
 
 

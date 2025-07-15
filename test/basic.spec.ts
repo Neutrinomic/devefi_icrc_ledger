@@ -1,6 +1,6 @@
 import { Principal } from '@dfinity/principal';
 import { resolve } from 'node:path';
-import { Actor, PocketIc, createIdentity } from '@hadronous/pic';
+import { Actor, PocketIc, createIdentity } from '@dfinity/pic';
 import { IDL } from '@dfinity/candid';
 import { _SERVICE as TestService, idlFactory as TestIdlFactory, init } from './build/basic.idl.js';
 
@@ -40,7 +40,7 @@ describe('Counter', () => {
       pic = await PocketIc.create(process.env.PIC_URL);
   
       // Ledger
-      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), pic.getSnsSubnet()?.id);
+      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), undefined );
       ledger = ledgerfixture.actor;
       ledgerCanisterId = ledgerfixture.canisterId;
       
@@ -49,17 +49,17 @@ describe('Counter', () => {
       user = fixture.actor;
       userCanisterId = fixture.canisterId;
 
+      await passTime(10);
 
+      let meta = await user.getMeta();
+      console.log(toState(meta));
     });
   
     afterAll(async () => {
       await pic.tearDown();
     });
   
-    it(`Check (minter) balance`  , async () => {
-      const result = await ledger.icrc1_balance_of({owner: jo.getPrincipal(), subaccount: []});
-      expect(toState(result)).toBe("100000000000")
-    });
+
 
     it(`Send 1 to Bob`, async () => {
       ledger.setIdentity(jo);
@@ -71,7 +71,7 @@ describe('Counter', () => {
         memo: [],
         created_at_time: [],
       });
-      expect(toState(result)).toStrictEqual({Ok:"1"});
+      expect(toState(result)).toStrictEqual({Ok:"0"});
     });
 
     it(`Check Bob balance`  , async () => {
@@ -83,21 +83,23 @@ describe('Counter', () => {
 
     it(`Check ledger transaction log`  , async () => {
       const result = await ledger.get_transactions({start: 0n, length: 100n});
-      expect(result.transactions.length).toBe(2);
-      expect(toState(result.log_length)).toBe("2");
+      expect(result.transactions.length).toBe(1);
+      expect(toState(result.log_length)).toBe("1");
       
     });
 
-    it(`start and last_indexed_tx should be at 2`, async () => {
+
+
+    it(`start and last_indexed_tx should be at 1`, async () => {
    
 
-      await passTime(4);
+      await passTime(1);
       const result2 = await user.get_info();
-      expect(toState(result2.last_indexed_tx)).toBe("2");
+      expect(toState(result2.last_indexed_tx)).toBe("1");
       
     });
 
-    it(`feed ledger user and check if it made the transactions`, async () => {
+    it(`feed ledger user and check if it made the transactions (from minter)`, async () => {
    
       const result = await ledger.icrc1_transfer({
         to: {owner: userCanisterId, subaccount:[]},
@@ -112,7 +114,7 @@ describe('Counter', () => {
 
       const result2 = await user.get_info();
 
-      expect(toState(result2.last_indexed_tx)).toBe("6003");
+      expect(toState(result2.last_indexed_tx)).toBe("6002");
       
     }, 600*1000);
 

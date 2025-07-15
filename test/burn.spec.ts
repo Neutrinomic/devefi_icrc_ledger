@@ -1,6 +1,6 @@
 import { Principal } from '@dfinity/principal';
 import { resolve } from 'node:path';
-import { Actor, PocketIc, createIdentity } from '@hadronous/pic';
+import { Actor, PocketIc, createIdentity } from '@dfinity/pic';
 import { IDL } from '@dfinity/candid';
 import { _SERVICE as TestService, idlFactory as TestIdlFactory, init } from './build/burn.idl.js';
 
@@ -41,7 +41,7 @@ describe('burn', () => {
       pic = await PocketIc.create(process.env.PIC_URL);
   
       // Ledger
-      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), pic.getSnsSubnet()?.id);
+      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), undefined);
       ledger = ledgerfixture.actor;
       ledgerCanisterId = ledgerfixture.canisterId;
       

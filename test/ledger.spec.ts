@@ -1,0 +1,197 @@
+import { Principal } from '@dfinity/principal';
+import { resolve } from 'node:path';
+import { Actor, PocketIc, createIdentity } from '@dfinity/pic';
+import { IDL } from '@dfinity/candid';
+import { _SERVICE as TestService, idlFactory as TestIdlFactory, init } from './build/basic.idl.js';
+
+import {ICRCLedgerService, ICRCLedger} from "./icrc_ledger/ledgerCanister";
+//@ts-ignore
+import {toState} from "@infu/icblast";
+// Jest can't handle multi threaded BigInts o.O That's why we use toState
+
+const WASM_PATH = resolve(__dirname, "./build/basic.wasm");
+
+export async function TestCan(pic:PocketIc, ledgerCanisterId:Principal) {
+    
+    const fixture = await pic.setupCanister<TestService>({
+        idlFactory: TestIdlFactory,
+        wasm: WASM_PATH,
+        arg: IDL.encode(init({ IDL }), [{ledgerId: ledgerCanisterId}]),
+    });
+
+    return fixture;
+};
+
+
+describe('Only ledger', () => {
+    let pic: PocketIc;
+    let ledger: Actor<ICRCLedgerService>;
+    let ledgerCanisterId: Principal;
+
+    const jo = createIdentity('superSecretAlicePassword');
+    const bob = createIdentity('superSecretBobPassword');
+    const zoo = createIdentity('superSecretZooPassword');
+  
+    beforeAll(async () => {
+
+
+      pic = await PocketIc.create(process.env.PIC_URL);
+  
+      // Ledger
+      const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), undefined );
+      ledger = ledgerfixture.actor;
+      ledgerCanisterId = ledgerfixture.canisterId;
+
+    });
+  
+    afterAll(async () => {
+      await pic.tearDown();
+    });
+  
+    it(`Check fee`  , async () => {
+      const result = await ledger.icrc1_fee();
+      expect(result).toBe(10000n);
+    });
+
+    it(`Check symbol`  , async () => {
+      const result = await ledger.icrc1_symbol();
+      expect(result).toBe("tCOIN");
+    });
+
+    it(`Check decimals`  , async () => {
+      const result = await ledger.icrc1_decimals();
+      expect(result).toBe(8);
+    });
+
+    it(`Check name`  , async () => {
+      const result = await ledger.icrc1_name();
+      expect(result).toBe("Test Coin");
+    });
+
+    it(`Check minting account`  , async () => {
+      const result = await ledger.icrc1_minting_account();
+      expect(result[0].owner.toText()).toBe(jo.getPrincipal().toText());
+    });
+
+    
+
+    it(`Check ledger transaction log`  , async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result.transactions.length).toBe(0);
+        expect(toState(result.log_length)).toBe("0");
+        
+      });
+
+    it(`Send 1 to Bob`, async () => {
+      ledger.setIdentity(jo);
+      const result = await ledger.icrc1_transfer({
+        to: {owner: bob.getPrincipal(), subaccount:[]},
+        from_subaccount: [],
+        amount: 1_0000_0000n,
+        fee: [],
+        memo: [],
+        created_at_time: [],
+      });
+      expect(toState(result)).toStrictEqual({Ok:"0"});
+    });
+
+    it(`Check Bob balance`  , async () => {
+      const result = await ledger.icrc1_balance_of({owner: bob.getPrincipal(), subaccount: []});
+      expect(toState(result)).toBe("100000000")
+    });
+
+
+
+    it(`Check ledger transaction log`  , async () => {
+      const result = await ledger.get_transactions({start: 0n, length: 100n});
+      expect(result.transactions.length).toBe(1);
+      expect(toState(result.log_length)).toBe("1");
+      
+    });
+
+
+    it(`Send 10 transactions to Bob`, async () => {
+      for (let i=0; i<10; i++) {
+        await ledger.icrc1_transfer({
+          to: {owner: bob.getPrincipal(), subaccount:[]},
+          from_subaccount: [],
+          amount: 1_0000_0000n,
+          fee: [],
+          memo: [],
+          created_at_time: [],
+        });
+      }
+    });
+
+    it(`Check ledger transaction log`  , async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result.transactions.length).toBe(11);
+        expect(toState(result.log_length)).toBe("11");
+        
+      });
+
+
+      it(`Check proper log length`  , async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 1n});
+        expect(result.transactions.length).toBe(1);
+        expect(toState(result.log_length)).toBe("11");
+        
+      });
+
+      it(`Check proper response in get_transactions`  , async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 0n});
+        expect(result.transactions.length).toBe(0);
+      
+        
+      });
+      it(`Check proper response in get_transactions (max hit)`  , async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result.transactions.length).toBe(11);
+        expect(toState(result.log_length)).toBe("11");
+
+      });
+
+      it(`First transaction should always be mint`  , async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 1n});
+        
+        expect(result.transactions[0].kind).toBe("mint");
+
+      });
+
+      it(`Bob send 10 transactions to Zoo`, async () => {
+        for (let i=0; i<10; i++) {
+          ledger.setIdentity(bob);
+          await ledger.icrc1_transfer({
+            to: {owner: zoo.getPrincipal(), subaccount:[]},
+            from_subaccount: [],
+            amount: 1_0000_0000n,
+            fee: [],
+            memo: [],
+            created_at_time: [],
+          });
+        }
+      });
+
+      it(`Fee is always inside transfers`  , async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        
+        let someTransfers = false
+        console.log(toState(result.transactions));
+        for (let i=0; i<result.transactions.length; i++) {
+            if (result.transactions[i].kind == "transfer") {
+              expect(result.transactions[i].transfer[0].fee[0]).toBe(10000n);  
+              someTransfers = true;
+            }
+        }
+        expect(someTransfers).toBe(true);
+      });
+
+      
+    async function passTime(n:number) {
+      for (let i=0; i<n; i++) {
+        await pic.advanceTime(3*1000);
+        await pic.tick(2);
+      }
+    }
+
+});

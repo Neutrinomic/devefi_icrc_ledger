@@ -17,16 +17,6 @@ actor class({ledgerId: Principal}) = this {
     stable let lmem = L.Mem.Ledger.V1.new();
     let ledger = L.Ledger<system>(lmem, Principal.toText(ledgerId), #id(0), Principal.fromActor(this));
     
-    ledger.onReceive(func (t) {
-        switch(t.from) {
-            case (#icrc(from)) {
-                ignore ledger.send({ to = from; amount = t.amount; from_subaccount = t.to.subaccount; });
-            };
-            case (_) ();
-        };
-        
-    });
-
     //---
 
     public query func get_balance(s: ?Blob) : async Nat {
