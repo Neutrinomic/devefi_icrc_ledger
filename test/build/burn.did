@@ -1,4 +1,4 @@
-type _anon_class_14_1 = 
+type _anon_class_15_1 = 
  service {
    accounts: () -> (vec record {
                           blob;
@@ -6,6 +6,10 @@ type _anon_class_14_1 =
                         }) query;
    getMeta: () -> (Meta) query;
    getPending: () -> (nat) query;
+   getSentTxs: () -> (vec record {
+                            nat64;
+                            nat;
+                          }) query;
    get_balance: (s: opt blob) -> (nat) query;
    get_errors: () -> (vec text) query;
    get_info: () -> (Info) query;
@@ -42,4 +46,4 @@ type Account =
    owner: principal;
    subaccount: opt blob;
  };
-service : (record {ledgerId: principal;}) -> _anon_class_14_1
+service : (record {ledgerId: principal;}) -> _anon_class_15_1

@@ -180,6 +180,58 @@ describe('Ledger goes down', () => {
         expect(toState(resp.pending)).toBe("0");
     });
 
+    it(`Stop ledger`, async () => {
+        await pic.stopCanister({canisterId: ledgerCanisterId});
+    });
+
+    
+    it(`Send transactions from canister`, async () => {
+        let bal = await user.get_balance([]);
+        expect(bal).toBe(98000000n);
+        for (let i=0; i<10; i++) {
+        let resp = await user.send_to(
+                {owner: bob.getPrincipal(), subaccount:[]},
+                100000n
+            );
+        };
+        await passTime(1);
+        let resp2 = await user.get_info();
+        let bal2 = await user.get_balance([]);
+
+        expect(bal2).toBe(98000000n - 10n*100000n);
+        expect(toState(resp2.pending)).toBe("10");
+
+        // Wait for the system to retry sending the transactions
+        await passTime(150);
+    });
+
+    it(`Stop user canister`, async () => {
+        await pic.stopCanister({canisterId: userCanisterId});
+    });
+
+    it(`Start ledger after 25h`, async () => {
+        await pic.advanceTime(25*60*60*1000);
+        await passTime(1);
+        await pic.startCanister({canisterId: ledgerCanisterId});
+      
+    });
+
+    it(`Start user canister`, async () => {
+        await pic.startCanister({canisterId: userCanisterId});
+    });
+
+    it(`Check if transactions have arrived`, async () => {
+        await passTime(40);
+        let resp = await user.get_info();
+        let bal2 = await user.get_balance([]);
+        expect(bal2).toBe(98000000n - 10n*100000n);
+        expect(toState(resp.last_indexed_tx)).toBe("31");
+        expect(toState(resp.pending)).toBe("0");
+    });
+
+    
+
+
     async function passTime(n:number) {
       for (let i=0; i<n; i++) {
         await pic.advanceTime(3*1000);

@@ -26,16 +26,17 @@ export interface Meta {
 export type R = { 'ok' : bigint } |
   { 'err' : SendError };
 export type SendError = { 'InsufficientFunds' : null };
-export interface _anon_class_14_1 {
+export interface _anon_class_15_1 {
   'accounts' : ActorMethod<[], Array<[Uint8Array | number[], bigint]>>,
   'getMeta' : ActorMethod<[], Meta>,
   'getPending' : ActorMethod<[], bigint>,
+  'getSentTxs' : ActorMethod<[], Array<[bigint, bigint]>>,
   'get_balance' : ActorMethod<[[] | [Uint8Array | number[]]], bigint>,
   'get_errors' : ActorMethod<[], Array<string>>,
   'get_info' : ActorMethod<[], Info>,
   'send_to' : ActorMethod<[Account, bigint], R>,
   'ver' : ActorMethod<[], bigint>,
 }
-export interface _SERVICE extends _anon_class_14_1 {}
+export interface _SERVICE extends _anon_class_15_1 {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];
