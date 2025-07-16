@@ -186,7 +186,15 @@ describe('Only ledger', () => {
         expect(someTransfers).toBe(true);
       });
 
-      
+      it(`first_index is correct in leder`  , async () => {
+        const result = await ledger.get_transactions({start: 5n, length: 100n});
+        // First index is the block id of the first transaction in the ledger (not start) 
+        // if there are archived blocks.
+        // With start=10, archived from 10 to 4000 and transactions from 4000 to 4500, first_index is 4000
+        // In archives it's the id of the first returned transaction
+        expect(result.first_index).toBe(5n);
+      });
+
     async function passTime(n:number) {
       for (let i=0; i<n; i++) {
         await pic.advanceTime(3*1000);
