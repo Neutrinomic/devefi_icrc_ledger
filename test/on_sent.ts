@@ -4,7 +4,7 @@ import { Actor, PocketIc, createIdentity } from '@dfinity/pic';
 import { IDL } from '@dfinity/candid';
 import { _SERVICE as TestService, idlFactory as TestIdlFactory, init } from './build/burn.idl.js';
 
-import {ICRCLedgerService, ICRCLedger} from "./icrc_ledger/ledgerCanister";
+import {ICRCLedgerService, ICRCLedger} from "./icrc_ledger/ledgerCanister.js";
 
 //@ts-ignore
 import {toState} from "@infu/icblast";
@@ -24,7 +24,7 @@ export async function TestCan(pic:PocketIc, ledgerCanisterId:Principal) {
 };
 
 
-describe('onReceive', () => {
+describe('onSent', () => {
     let pic: PocketIc;
     let user: Actor<TestService>;
     let ledger: Actor<ICRCLedgerService>;

@@ -36,7 +36,7 @@
       "./global-setup.ts",
       "./global-teardown.ts",
       "./types.d.ts",
-      "jest.custom-matchers.d.ts",
+      "jest.custom-matchers.d.ts", "on_sent.ts",
 
     ]
   }
