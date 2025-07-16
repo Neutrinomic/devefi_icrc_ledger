@@ -36,11 +36,13 @@ describe('Only ledger', () => {
 
 
       pic = await PocketIc.create(process.env.PIC_URL);
-  
+      await pic.setTime(new Date(Date.now()).getTime());
       // Ledger
       const ledgerfixture = await ICRCLedger(pic, jo.getPrincipal(), undefined );
       ledger = ledgerfixture.actor;
       ledgerCanisterId = ledgerfixture.canisterId;
+
+      
 
     });
   
@@ -176,7 +178,7 @@ describe('Only ledger', () => {
         const result = await ledger.get_transactions({start: 0n, length: 100n});
         
         let someTransfers = false
-        console.log(toState(result.transactions));
+        
         for (let i=0; i<result.transactions.length; i++) {
             if (result.transactions[i].kind == "transfer") {
               expect(result.transactions[i].transfer[0].fee[0]).toBe(10000n);  
@@ -188,11 +190,155 @@ describe('Only ledger', () => {
 
       it(`first_index is correct in leder`  , async () => {
         const result = await ledger.get_transactions({start: 5n, length: 100n});
-        // First index is the block id of the first transaction in the ledger (not start) 
-        // if there are archived blocks.
-        // With start=10, archived from 10 to 4000 and transactions from 4000 to 4500, first_index is 4000
-        // In archives it's the id of the first returned transaction
+        // First index is the first transaction in the returned 'transactions' array
+        
         expect(result.first_index).toBe(5n);
+      });
+
+
+      it(`Test deduplication`, async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result.log_length).toBe(21n);
+        let created_at = BigInt(Math.round(await pic.getTime())) * 1000000n;
+        for (let i=0; i<10; i++) {
+          ledger.setIdentity(jo);
+          let trez = await ledger.icrc1_transfer({
+            to: {owner: bob.getPrincipal(), subaccount:[]},
+            from_subaccount: [],
+            amount: 1_0000_0000n,
+            fee: [],
+            memo: [[0,0,0,0,0,0,0,5]],
+            created_at_time: [ created_at ], // time in nanoseconds since epoch
+          });
+          if (i == 0) expect(toState(trez).Ok).toBe("21");
+          if (i > 0) expect(toState(trez).Err).toStrictEqual({"Duplicate": {"duplicate_of": "21"}});
+        }
+
+        const result2 = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result2.log_length).toBe(22n); // Only one new transaction should be added
+
+
+      });
+
+      it(`Test deduplication - different created_at, same memo`, async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result.log_length).toBe(22n);
+        await passTime(1);
+        let created_at = BigInt(Math.round(await pic.getTime())) * 1000000n;
+        for (let i=0; i<3; i++) {
+          ledger.setIdentity(jo);
+          let trez = await ledger.icrc1_transfer({
+            to: {owner: bob.getPrincipal(), subaccount:[]},
+            from_subaccount: [],
+            amount: 1_0000_0000n,
+            fee: [],
+            memo: [[0,0,0,0,0,0,0,5]],
+            created_at_time: [ created_at ], // time in nanoseconds since epoch
+          });
+          if (i == 0) expect(toState(trez).Ok).toBe("22");
+          if (i > 0) expect(toState(trez).Err).toStrictEqual({"Duplicate": {"duplicate_of": "22"}});
+        }
+
+        const result2 = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result2.log_length).toBe(23n); // Only one new transaction should be added
+
+      });
+
+      it(`Test deduplication - different memo, same created_at`, async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result.log_length).toBe(23n);
+        await passTime(1);
+        let created_at = BigInt(Math.round(await pic.getTime())) * 1000000n;
+        for (let i=0; i<3; i++) {
+          ledger.setIdentity(jo);
+          let trez = await ledger.icrc1_transfer({
+            to: {owner: bob.getPrincipal(), subaccount:[]},
+            from_subaccount: [],
+            amount: 1_0000_0000n,
+            fee: [],
+            memo: [[0,0,0,0,0,0,0,i]],
+            created_at_time: [ created_at ], // time in nanoseconds since epoch
+          });
+          expect(toState(trez).Ok).toBeDefined();
+          
+        }
+
+        const result2 = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result2.log_length).toBe(26n); // Only one new transaction should be added
+
+      });
+
+
+      it(`Test deduplication - 23hour time gap`, async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result.log_length).toBe(26n);
+        await passTime(1);
+        let created_at = BigInt(Math.round(await pic.getTime())) * 1000000n;
+   
+        ledger.setIdentity(jo);
+        let trez = await ledger.icrc1_transfer({
+          to: {owner: bob.getPrincipal(), subaccount:[]},
+          from_subaccount: [],
+          amount: 1_0000_0000n,
+          fee: [],
+          memo: [[0,0,0,0,0,0,0,123]],
+          created_at_time: [ created_at ], // time in nanoseconds since epoch
+        });
+        expect(toState(trez).Ok).toBeDefined();
+    
+        await pic.advanceTime(23*60*60*1000);
+        await passTime(10);
+
+        let trez2 = await ledger.icrc1_transfer({
+          to: {owner: bob.getPrincipal(), subaccount:[]},
+          from_subaccount: [],
+          amount: 1_0000_0000n,
+          fee: [],
+          memo: [[0,0,0,0,0,0,0,123]],
+          created_at_time: [ created_at ], // time in nanoseconds since epoch
+        });
+        expect(toState(trez2).Err).toStrictEqual({"Duplicate": {"duplicate_of": "26"}});
+
+        const result2 = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result2.log_length).toBe(27n); // Only one new transaction should be added
+
+      });
+
+      it(`Test deduplication - more than 24hour time gap (TX WINDOW 24h)`, async () => {
+        const result = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result.log_length).toBe(27n);
+        let created_at = BigInt(Math.round(await pic.getTime())) * 1000000n;
+   
+        ledger.setIdentity(jo);
+        let trez = await ledger.icrc1_transfer({
+          to: {owner: bob.getPrincipal(), subaccount:[]},
+          from_subaccount: [],
+          amount: 1_0000_0000n,
+          fee: [],
+          memo: [[0,0,0,0,0,0,0,123]],
+          created_at_time: [ created_at ], // time in nanoseconds since epoch
+        });
+        expect(toState(trez).Ok).toBeDefined();
+    
+        
+        await pic.advanceTime(25*60*60*1000);
+        await passTime(1);
+        
+
+        let trez2 = await ledger.icrc1_transfer({
+          to: {owner: bob.getPrincipal(), subaccount:[]},
+          from_subaccount: [],
+          amount: 1_0000_0000n,
+          fee: [],
+          memo: [[0,0,0,0,0,0,0,123]],
+          created_at_time: [ created_at ], // time in nanoseconds since epoch
+        });
+
+        expect(toState(trez2).Err).toStrictEqual({ TooOld: null });
+
+        const result2 = await ledger.get_transactions({start: 0n, length: 100n});
+        expect(result2.log_length).toBe(28n); // Only one new transaction should be added
+
       });
 
     async function passTime(n:number) {
