@@ -131,21 +131,25 @@ module {
             // If there are no archived transactions, we can just process the transactions that are inside the ledger and not inside archive
             if (rez.archived_transactions.size() == 0) {
 
-                // Protection against reentrancy and corrupt responses
-                if (rez.first_index != mem.last_indexed_tx) {
-                    onError("rez.first_index !== mem.last_indexed_tx | rez.first_index: " # Nat.toText(rez.first_index) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " rez.transactions.size(): " # Nat.toText(rez.transactions.size()));
-                    lock := 0;
-                    return;
+           
+                if (rez.transactions.size() != 0) {
+                        
+                    // Protection against reentrancy and corrupt responses
+                    if (rez.first_index != mem.last_indexed_tx) {
+                        onError("ledger.get_transactions start: " # Nat.toText(query_start) # " length: " # Nat.toText(maxTransactionsInCall * maxSimultaneousRequests) # " rez.first_index !== mem.last_indexed_tx | rez.first_index: " # Nat.toText(rez.first_index) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " rez.transactions.size(): " # Nat.toText(rez.transactions.size()));
+                        lock := 0;
+                        return;
+                    };
+
+                    // We can just process the transactions that are inside the ledger and not inside archive
+                    onRead(rez.transactions, mem.last_indexed_tx);
+
+                    // We update the last indexed transaction
+                    mem.last_indexed_tx += rez.transactions.size();
+            
+                    // We update the last transaction time
+                    lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
                 };
-
-                // We can just process the transactions that are inside the ledger and not inside archive
-                onRead(rez.transactions, mem.last_indexed_tx);
-
-                // We update the last indexed transaction
-                mem.last_indexed_tx += rez.transactions.size();
-         
-                // We update the last transaction time
-                if (rez.transactions.size() != 0) lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
             
             } else {
                 // If there are archived transactions, we need to collect them and get them in order

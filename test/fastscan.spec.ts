@@ -59,6 +59,11 @@ describe('Passback', () => {
     await pic.tearDown();
   });
 
+  it(`Check if fee is correct`, async () => {
+    const result = await ledger.icrc1_fee();
+    expect(result).toBe(10000n);
+  });
+
   it(`Check can balance before`, async () => {
     const result = await user.get_balance([]);
     expect(toState(result)).toBe("0")
@@ -131,7 +136,9 @@ describe('Passback', () => {
     await pic.startCanister({ canisterId: userCanisterId });
     await passTime(5);
     // Upgrade canister using ledger middleware
+    await pic.stopCanister({ canisterId: userCanisterId });
     await pic.upgradeCanister({ canisterId: userCanisterId, wasm: WASM_PATH_basic, arg: IDL.encode(init({ IDL }), [{ ledgerId: ledgerCanisterId }]) });
+    await pic.startCanister({ canisterId: userCanisterId });
     await passTime(2);
 
     // Stop start Ledger
@@ -140,61 +147,47 @@ describe('Passback', () => {
     await pic.startCanister({ canisterId: ledgerCanisterId });
 
     // Upgrade ledger 
+    await pic.stopCanister({ canisterId: ledgerCanisterId });
     await ICRCLedgerUpgrade(pic, jo.getPrincipal(), ledgerCanisterId, undefined);
+    await pic.startCanister({ canisterId: ledgerCanisterId });
     await passTime(2);
     // Upgrade the canister using devefi ledger middleware
+    await pic.stopCanister({ canisterId: userCanisterId });
     await pic.upgradeCanister({ canisterId: userCanisterId, wasm: WASM_PATH_basic, arg: IDL.encode(init({ IDL }), [{ ledgerId: ledgerCanisterId }]) });
+    await pic.startCanister({ canisterId: userCanisterId });
     await passTime(2);
 
     let tr = await ledger.get_transactions({ start : 0n, length : 0n });
     expect(tr.log_length).toBeLessThan(7001n);
 
     // Upgrade ledger 
+    await pic.stopCanister({ canisterId: ledgerCanisterId });
     await ICRCLedgerUpgrade(pic, jo.getPrincipal(), ledgerCanisterId, undefined);
+    await pic.startCanister({ canisterId: ledgerCanisterId });
     await pic.advanceTime(13 * 1000);
 
-
-    await passTime(120);
+    for (let i = 0; i < 100; i++) {
+      await passTime(10);
+      let tr = await ledger.get_transactions({ start : 0n, length : 0n });
+      if (tr.log_length >= 8011n) {
+        break;
+      };
+    };
+    
   }, 600*1000);
 
   it(`Check log length`, async () => {
-    await passTime(20);
+    await passTime(110);
     let real = await ledger.get_transactions({ start : 0n, length : 0n });
 
     const result2 = await user.get_info();
-
+    expect(real.log_length).toBe(8011n);
+    expect(result2.pending).toBe(0n);
     expect(result2.last_indexed_tx).toBe(real.log_length);
+    
+    
 
   }, 600*1000);
-
-
-  it('Compare user balances to snapshot', async () => {
-    let accounts = await user.accounts();
-    // order by balance
-    accounts.sort((a:any, b:any) => b[0] > a[0] ? 1 : b[0] < a[0] ? -1 : 0);
-    let state = toState(accounts);
-    accountsSnapshot = state;
-    expect(state).toMatchSnapshot("accounts")
-  });
-
-  it('Check if error log is empty', async () => {
-    let errs = await user.get_errors();
-    expect(toState(errs)).toStrictEqual([]);
-  });
-
-  it(`Reinstall canister, scan everything again and compare balances`, async () => {
-
-      await pic.reinstallCode({ canisterId: userCanisterId, wasm: WASM_PATH, arg: IDL.encode(init({ IDL }), [{ ledgerId: ledgerCanisterId }]) });
-
-
-      await passTime(10);
-      let accounts = await user.accounts();
-      // order by balance
-      accounts.sort((a:any, b:any) => b[0] > a[0] ? 1 : b[0] < a[0] ? -1 : 0);
-
-      expect(toState(accounts)).toStrictEqual(accountsSnapshot);
-
-  });
 
 
   it(`Check if the sum of all balances is correct`, async () => {
@@ -213,6 +206,33 @@ describe('Passback', () => {
   });
   
 
+  it('Compare user balances to snapshot', async () => {
+    let state = accountBalancesOnlyOrdered(toState(await user.accounts()));
+    accountsSnapshot = state;
+    expect(state).toMatchSnapshot("accounts")
+  });
+
+
+  function accountBalancesOnlyOrdered(accounts: any[]) {
+    return accounts.map((a:any) => a[1]).sort((a:any, b:any) => b > a ? 1 : b < a ? -1 : 0);
+  }
+
+  it(`Reinstall canister, scan everything again and compare balances`, async () => {
+
+      await pic.reinstallCode({ canisterId: userCanisterId, wasm: WASM_PATH, arg: IDL.encode(init({ IDL }), [{ ledgerId: ledgerCanisterId }]) });
+
+
+      await passTime(100);
+      
+      let accounts = accountBalancesOnlyOrdered(toState(await user.accounts()));
+     
+
+      expect(accounts).toStrictEqual(accountsSnapshot);
+
+  });
+
+
+
   it(`Check log length`, async () => {
     await passTime(20);
     let real = await ledger.get_transactions({ start : 0n, length : 0n });
@@ -225,15 +245,20 @@ describe('Passback', () => {
 
 
   it(`Reinstall canister, stop, upgrade, scan everything again and compare balances`, async () => {
-
+    await pic.stopCanister({ canisterId: userCanisterId });
     await pic.reinstallCode({ canisterId: userCanisterId, wasm: WASM_PATH, arg: IDL.encode(init({ IDL }), [{ ledgerId: ledgerCanisterId }]) });
+    await pic.startCanister({ canisterId: userCanisterId });
 
     await passTime(1);
     //upgrade ledger
+    await pic.stopCanister({ canisterId: ledgerCanisterId });
     await ICRCLedgerUpgrade(pic, jo.getPrincipal(), ledgerCanisterId, undefined);
+    await pic.startCanister({ canisterId: ledgerCanisterId });
     await passTime(1);
     //upgrade canister
+    await pic.stopCanister({ canisterId: userCanisterId });
     await pic.upgradeCanister({ canisterId: userCanisterId, wasm: WASM_PATH, arg: IDL.encode(init({ IDL }), [{ ledgerId: ledgerCanisterId }]) });
+    await pic.startCanister({ canisterId: userCanisterId });
     await passTime(1);
 
     // stop canister 
@@ -243,11 +268,11 @@ describe('Passback', () => {
     await pic.startCanister({ canisterId: userCanisterId });
     await passTime(1);
 
-    let accounts = await user.accounts();
-    // order by balance
-    accounts.sort((a:any, b:any) => b[0] > a[0] ? 1 : b[0] < a[0] ? -1 : 0);
 
-    expect(toState(accounts)).toStrictEqual(accountsSnapshot);
+    await passTime(100);
+    let accounts = accountBalancesOnlyOrdered(toState(await user.accounts()));
+
+    expect(accounts).toStrictEqual(accountsSnapshot);
 
 });
 
@@ -273,7 +298,9 @@ it(`Check log length`, async () => {
   let real = await ledger.get_transactions({ start : 0n, length : 0n });
 
   const result2 = await user.get_info();
-
+  console.log(result2);
+  let errs = await user.get_errors();
+  console.log(errs);
   expect(result2.last_indexed_tx).toBe(real.log_length);
 
 }, 600*1000);

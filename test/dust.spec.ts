@@ -24,7 +24,7 @@ export async function TestCan(pic:PocketIc, usercan:Principal, ledgerCanisterId:
 };
 
 
-describe('Only ledger', () => {
+describe('Dust', () => {
     let pic: PocketIc;
     let ledger: Actor<ICRCLedgerService>;
     let ledgerCanisterId: Principal;
@@ -80,8 +80,9 @@ describe('Only ledger', () => {
     });
 
     it(`Check transaction log canister`, async () => {
+        await passTime(1);
         let resp = await user.get_info();
-        expect(toState(resp.last_indexed_tx)).toBe("0");
+        expect(toState(resp.last_indexed_tx)).toBe("1");
     });
 
     it(`Check transaction log ledger`, async () => {
@@ -164,7 +165,7 @@ describe('Only ledger', () => {
           expect(toState(resp3.transactions.length)).toBe(3);
 
           expect(resp3.transactions[2].transfer[0].amount).toBe(1n);
-          expect(Array.from(resp3.transactions[2].transfer[0].memo[0])).toStrictEqual([0,0,0,0,0,0,0,2]);
+          expect(Array.from(resp3.transactions[2].transfer[0].memo[0])).toStrictEqual([0,0,0,0,0,0,0,3]);
           expect(resp3.transactions[2].transfer[0].created_at_time[0]).toBeDefined();
     });
 

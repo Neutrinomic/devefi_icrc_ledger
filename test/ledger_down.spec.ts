@@ -85,10 +85,10 @@ describe('Ledger goes down', () => {
        
 
           let resp2 = await user.get_info();
-          expect(toState(resp2.last_indexed_tx)).toBe("1");
+          expect(toState(resp2.last_indexed_tx)).toBe("2");
 
           let resp3 = await ledger.get_transactions({start: 0n, length: 100n});
-          expect(toState(resp3.transactions.length)).toBe(1);
+          expect(toState(resp3.transactions.length)).toBe(2);
     });
 
 
@@ -130,7 +130,7 @@ describe('Ledger goes down', () => {
     it(`Check if transactions have arrived`, async () => {
         await passTime(10);
         let resp = await user.get_info();
-        expect(toState(resp.last_indexed_tx)).toBe("11");
+        expect(toState(resp.last_indexed_tx)).toBe("12");
         expect(toState(resp.pending)).toBe("0");
     });
 
@@ -168,16 +168,23 @@ describe('Ledger goes down', () => {
       
 
     it(`Start ledger after 25 hours (out of tx window)`, async () => {
+        await pic.startCanister({canisterId: ledgerCanisterId});
+        // Check if ledger canister is up
+        let resp = await ledger.icrc1_fee();
+        expect(resp).toBe(10000n);
         await pic.advanceTime(25*60*60*1000);
         await passTime(1);
-        await pic.startCanister({canisterId: ledgerCanisterId});
+
       });
 
-    it(`Check if transactions have arrived`, async () => {
-        await passTime(10);
+    it(`Check if transactions have arrived 2`, async () => {
+        await passTime(20);
         let resp = await user.get_info();
-        expect(toState(resp.last_indexed_tx)).toBe("21");
+        let errs = await user.get_errors();
+    
         expect(toState(resp.pending)).toBe("0");
+        expect(toState(resp.last_indexed_tx)).toBe("22");
+        
     });
 
     it(`Stop ledger`, async () => {
@@ -187,7 +194,7 @@ describe('Ledger goes down', () => {
     
     it(`Send transactions from canister`, async () => {
         let bal = await user.get_balance([]);
-        expect(bal).toBe(98000000n);
+        expect(bal).toBe(97900000n);
         for (let i=0; i<10; i++) {
         let resp = await user.send_to(
                 {owner: bob.getPrincipal(), subaccount:[]},
@@ -198,7 +205,7 @@ describe('Ledger goes down', () => {
         let resp2 = await user.get_info();
         let bal2 = await user.get_balance([]);
 
-        expect(bal2).toBe(98000000n - 10n*100000n);
+        expect(bal2).toBe(98000000n - 11n*100000n);
         expect(toState(resp2.pending)).toBe("10");
 
         // Wait for the system to retry sending the transactions
@@ -224,8 +231,8 @@ describe('Ledger goes down', () => {
         await passTime(40);
         let resp = await user.get_info();
         let bal2 = await user.get_balance([]);
-        expect(bal2).toBe(98000000n - 10n*100000n);
-        expect(toState(resp.last_indexed_tx)).toBe("31");
+        expect(bal2).toBe(98000000n - 11n*100000n);
+        expect(toState(resp.last_indexed_tx)).toBe("32");
         expect(toState(resp.pending)).toBe("0");
     });
 
