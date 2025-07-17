@@ -18,7 +18,7 @@ function get_args(me:Principal) {
                 owner: me,
                 subaccount: []
             },
-            fee_collector_account: [{ owner: me, subaccount:[] }],
+            fee_collector_account: [], //{ owner: me, subaccount:[] }
             transfer_fee: 10000n,
             decimals: [8],
             token_symbol: "tCOIN",

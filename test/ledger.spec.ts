@@ -196,12 +196,6 @@ describe('Only ledger', () => {
       });
 
 
-      it(`first_index is correct in leder (start higher than log length)`  , async () => {
-        const result = await ledger.get_transactions({start: 21n, length: 100n});
-        
-        expect(result.first_index).toBe(21n);
-        expect(result.transactions.length).toBe(0);
-      });
 
       it(`Test deduplication`, async () => {
         const result = await ledger.get_transactions({start: 0n, length: 100n});

@@ -5,7 +5,7 @@ let ic = icblast({})
 
 let snsw = await ic("qaa6y-5yaaa-aaaaa-aaafa-cai");
 
-let upgradesteps = await snsw.list_upgrade_steps({limit:100});
+let upgradesteps = await snsw.list_upgrade_steps({limit:500});
 
 let last_ledger_hash = upgradesteps.steps[upgradesteps.steps.length-1].pretty_version.ledger_wasm_hash;
 
