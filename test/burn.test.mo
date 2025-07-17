@@ -27,7 +27,7 @@ actor class({ledgerId: Principal}) = this {
     });
 
     public shared func send_to(to: LC.Account, amount: Nat) : async R<Nat64, L.SendError> {
-        ledger.send({ to = to; amount; from_subaccount = null; });
+        ledger.send({ to = to; amount; from_subaccount = null; memo = null; });
     };
     //---
 

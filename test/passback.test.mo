@@ -20,7 +20,7 @@ actor class({ledgerId: Principal}) = this {
     ledger.onReceive(func (t) {
         switch(t.from) {
             case (#icrc(from)) {
-                ignore ledger.send({ to = from; amount = t.amount; from_subaccount = t.to.subaccount; });
+                ignore ledger.send({ to = from; amount = t.amount; from_subaccount = t.to.subaccount; memo = null; });
             };
             case (_) ();
         };

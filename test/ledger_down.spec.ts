@@ -183,6 +183,7 @@ describe('Ledger goes down', () => {
         let errs = await user.get_errors();
     
         expect(toState(resp.pending)).toBe("0");
+
         expect(toState(resp.last_indexed_tx)).toBe("22");
         
     });

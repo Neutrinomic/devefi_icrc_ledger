@@ -69,7 +69,7 @@ describe('Only ledger', () => {
     
           await passTime(2);
     
-          expect(toState(resp).ok).toBe("0");
+          expect(toState(resp).ok).toBeDefined();
     });
     
     it(`Check if minter is set`, async () => {
@@ -91,7 +91,7 @@ describe('Only ledger', () => {
         expect(tx.kind).toBe("mint");
         expect(tx.mint[0].to.owner.toText()).toBe(bob.getPrincipal().toText());
         expect(tx.mint[0].amount).toBe(99990000n);
-        expect(Array.from(tx.mint[0].memo[0])).toStrictEqual([0,0,0,0,0,0,0,0]);
+        expect(Array.from(tx.mint[0].memo[0])).toStrictEqual([0,0,0,0,0,0,0,1]);
         expect(tx.mint[0].created_at_time[0]).toBeDefined();
     });
 

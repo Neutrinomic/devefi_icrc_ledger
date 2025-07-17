@@ -28,6 +28,7 @@ module {
         amount: Nat;
         to: Ledger.Account;
         from_subaccount : ?Blob;
+        memo : ?Blob;
     };
 
 
@@ -61,7 +62,8 @@ module {
         let mem = MU.access(xmem);
         let ledger = actor(Principal.toText(ledger_id)) : Ledger.Oneway;
         var getReaderLastUpdate : ?(() -> (Nat64)) = null;
-        
+
+               
 
         public func setGetReaderLastUpdate(fn : () -> (Nat64)) {
             getReaderLastUpdate := ?fn;
@@ -89,9 +91,9 @@ module {
                 return; // Don't attempt to send transactions if the reader is lagging too far behind
             };
             var sent_count = 0;
-            label vtransactions for ((id, tx) in transactions_to_send.results.vals()) {
+            label vtransactions for ((initial_id, tx) in transactions_to_send.results.vals()) {
                 if (tx.amount <= fee) {
-                    ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
+                    ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, initial_id);
                     continue vtransactions;
                 };
 
@@ -99,7 +101,25 @@ module {
 
                 if (tx.tries >= time_for_try) continue vtransactions;
                 
-                let created_at_adjusted = adjustTXWINDOW(nowU64, tx.created_at_time);
+                var created_at_adjusted = adjustTXWINDOW(nowU64, tx.created_at_time);
+                if (created_at_adjusted != tx.created_at_time) {
+                    // Since we are now sending it with a different created_at_time, we need to delete the old one and insert the new one
+                    // Or we won't be able to see it in the ledger
+                    let old_created_at_time = tx.created_at_time;
+                    var find_idx = 0;
+                    label find_unused_id loop { // Make sure we don't have a collision
+                            tx.created_at_time := created_at_adjusted;
+                            find_idx += 1;
+                            if (find_idx > 100) break find_unused_id;
+                            if (not BTree.has(mem.transactions, Nat64.compare, created_at_adjusted)) {
+                                ignore BTree.insert<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, created_at_adjusted, tx);
+                                ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, old_created_at_time);
+                                break find_unused_id;
+                            } else {
+                                created_at_adjusted += 1;
+                            }
+                    };
+                };
 
                 try {
                     // Relies on transaction deduplication https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-1/README.md
@@ -160,6 +180,24 @@ module {
             null;
         };
 
+        private func getCreatedAtTime(tx: Ledger.Transaction) : ?(Ledger.Account, Nat64) {
+            if (tx.kind == "mint") {
+                let ?mint = tx.mint else return null;
+                let ?minter = getMinter() else return null;
+                return do ? {(minter, mint.created_at_time!)};
+            };
+            if (tx.kind == "transfer") {
+                let ?tr = tx.transfer else return null;
+                return do ? {(tr.from, tr.created_at_time!)};
+            };
+            if (tx.kind == "burn") {
+                let ?burn = tx.burn else return null;
+                return do ? {(burn.from, burn.created_at_time!)};
+            };
+            return null;
+        };
+
+
         public func confirm(txs: [Ledger.Transaction], start_id: Nat) {
             // If our canister sends to a burn address it will be a burn tx.
             // If our canister is the minter address, tx will appear as mint
@@ -169,10 +207,9 @@ module {
             let confirmations = Vector.new<(Nat64, Nat)>();
             label tloop for (idx in txs.keys()) { 
                 let tx=txs[idx];
-                let ?(tx_from, tx_memo) = getTxMemoFrom(tx) else continue tloop;
+                let ?(tx_from, id) = getCreatedAtTime(tx) else continue tloop;
                 if (tx_from.owner != me_can) continue tloop;
-                let ?id = DNat64(Blob.toArray(tx_memo)) else continue tloop;
-                
+         
                 ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
                 Vector.add<(Nat64, Nat)>(confirmations, (id, start_id + idx));
             };
@@ -188,8 +225,11 @@ module {
                 amount = tx.amount;
                 to = tx.to;
                 from_subaccount = tx.from_subaccount;
-                var created_at_time = Nat64.fromNat(Int.abs(Time.now()));
-                memo = Blob.fromArray(ENat64(id));
+                var created_at_time = id;
+                memo = switch(tx.memo) {
+                    case (null) Blob.fromArray(ENat64(1)); // Always needs memo for deduplication to work
+                    case (?m) m;
+                }; 
                 var tries = 0;
             };
             

@@ -165,7 +165,7 @@ describe('Dust', () => {
           expect(toState(resp3.transactions.length)).toBe(3);
 
           expect(resp3.transactions[2].transfer[0].amount).toBe(1n);
-          expect(Array.from(resp3.transactions[2].transfer[0].memo[0])).toStrictEqual([0,0,0,0,0,0,0,3]);
+          expect(Array.from(resp3.transactions[2].transfer[0].memo[0])).toStrictEqual([0,0,0,0,0,0,0,1]);
           expect(resp3.transactions[2].transfer[0].created_at_time[0]).toBeDefined();
     });
 

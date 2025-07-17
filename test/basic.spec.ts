@@ -52,7 +52,6 @@ describe('Counter', () => {
       await passTime(10);
 
       let meta = await user.getMeta();
-      console.log(toState(meta));
     });
   
     afterAll(async () => {

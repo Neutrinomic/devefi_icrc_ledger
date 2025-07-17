@@ -15,6 +15,8 @@ import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Ver1 "./memory/v1";
 import MU "mo:mosup";
+import Int "mo:base/Int";
+import Time "mo:base/Time";
 
 module {
     type R<A, B> = Result.Result<A, B>;
@@ -345,8 +347,16 @@ module {
                 acc.in_transit += tr.amount;   
             };
             
-            let id = lmem.next_tx_id;
-            lmem.next_tx_id += 1;
+            var created_at_time = (Nat64.fromNat(Int.abs(Time.now()))/1_000_000_000)*1_000_000_000; 
+
+            let id = if (lmem.next_tx_id >= created_at_time) {
+                    lmem.next_tx_id += 1;
+                    lmem.next_tx_id;
+                } else {
+                    lmem.next_tx_id := created_at_time;
+                    created_at_time;
+                };
+    
             icrc_sender.send(id, tr);
             #ok(id);
         };
@@ -377,8 +387,9 @@ module {
             callback_onSent := ?fn;
         };
 
+        /// If checking for transaction that wasn't queued yet, this function will return wrong result.
         public func isSent(id : Nat64) : Bool {
-            if (id >= lmem.next_tx_id) return false;
+           
             icrc_sender.isSent(id);
         };
 

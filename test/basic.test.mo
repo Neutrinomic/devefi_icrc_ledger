@@ -46,7 +46,7 @@ actor class({ledgerId: Principal}) = this {
                 let amount = t.amount / 10000; // Each account gets 1/10000
                 // Debug.print(">>>" # debug_show(amount));
 
-                ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to.subaccount; });
+                ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(Nat64.fromNat(i))}; amount; from_subaccount = t.to.subaccount; memo = null; });
                 i += 1;
                 if (i >= 1_001) break sending;
             }
@@ -55,7 +55,7 @@ actor class({ledgerId: Principal}) = this {
             // we will pass half to another subaccount
             if (t.amount/10 < ledger.getFee() ) return; // if we send that it will be removed from our balance but won't register
             // Debug.print(debug_show(t.amount/10));
-            ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount / 10 ; from_subaccount = t.to.subaccount; });
+            ignore ledger.send({ to = {owner=ledger.me(); subaccount=test_subaccount(next_subaccount_id)}; amount = t.amount / 10 ; from_subaccount = t.to.subaccount; memo = null; });
             next_subaccount_id += 1;
         }
     });

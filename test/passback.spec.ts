@@ -81,10 +81,10 @@ describe('Passback', () => {
     let real = await ledger.get_transactions({ start : 0n, length : 0n });
 
     const result2 = await user.get_info();
-    console.log(toState(result2));
+    
 
     let meta = await user.getMeta();
-    console.log(toState(meta));
+    
     expect(result2.last_indexed_tx).toBe(real.log_length);
 
   });
