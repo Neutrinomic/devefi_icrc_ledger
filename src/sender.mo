@@ -110,7 +110,7 @@ module {
                     label find_unused_id loop { // Make sure we don't have a collision
                             tx.created_at_time := created_at_adjusted;
                             find_idx += 1;
-                            if (find_idx > 100) break find_unused_id;
+                            if (find_idx > 100) continue vtransactions;
                             if (not BTree.has(mem.transactions, Nat64.compare, created_at_adjusted)) {
                                 ignore BTree.insert<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, created_at_adjusted, tx);
                                 ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, old_created_at_time);
