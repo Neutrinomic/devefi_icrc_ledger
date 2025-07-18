@@ -1,3 +1,0 @@
-[submodule "test"]
-	path = test
-	url = git@github.com:Neutrinomic/devefi_ledger_tests.git
