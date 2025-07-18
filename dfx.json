@@ -1,9 +1,5 @@
 {
   "canisters": {
-    "test": {
-      "type": "motoko",
-      "main": "./test/maker/main.mo"
-    }
    },
   "defaults": {
     "build": {

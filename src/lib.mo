@@ -339,9 +339,16 @@ module {
 
             // Check if from is the minter, if so we don't need to check balance and track in transit
             let ?m = lmem.meta else trap("ERR104");
-            let ?minter = m.minter else trap("ERR105");
+            let is_mint = switch(m.minter) {
+                case (?m) {
+                    me_can == m.owner and tr.from_subaccount == m.subaccount
+                };
+                case (null) {
+                    false
+                };
+            };
 
-            if (not ((me_can == minter.owner) and (tr.from_subaccount == minter.subaccount))) {
+            if (not is_mint) {
                 let ?acc = Map.get(lmem.accounts, Map.bhash, subaccountToBlob(tr.from_subaccount)) else return #err(#InsufficientFunds);
                 if (acc.balance : Nat - acc.in_transit : Nat < tr.amount) return #err(#InsufficientFunds);
                 acc.in_transit += tr.amount;   
@@ -393,7 +400,19 @@ module {
             icrc_sender.isSent(id);
         };
 
-        
+        // Here so we have the same interface as the icp ledger
+        public func registerSubaccount(subaccount: ?Blob) : () {
+            // do nothing
+        };
+
+        public func unregisterSubaccount(subaccount: ?Blob) : () {
+            // do nothing
+        };
+
+        public func isRegisteredSubaccount(subaccount: ?Blob) : Bool {
+            true;
+        };
+
         ignore Timer.setTimer<system>(#seconds 0, retrieveMeta);
         ignore Timer.recurringTimer<system>(#seconds 3600, retrieveMeta); // every hour
 
