@@ -38,6 +38,7 @@ module {
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
         onRead : ([Ledger.Transaction], Nat) -> ();
         maxSimultaneousRequests : Nat;
+        readingEnabled : () -> Bool;
     }) {
         let mem = MU.access(xmem);
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
@@ -69,7 +70,7 @@ module {
         /// # Postcondition: if something went wrong, we will retry indefinitely
         /// # Postcondition: if a call doesn't arrive on time we will unlock. Once it arrives it won't be processed because of the reentrancy protections
         private func cycle() : async () {
-            
+            if (not readingEnabled()) return;
 
             // Protection against reentrancy
             // If the cycle is called again before the previous cycle is finished, we return

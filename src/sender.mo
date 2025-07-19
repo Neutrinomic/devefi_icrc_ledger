@@ -23,10 +23,14 @@ module {
             public let V1 = Ver1.Sender;
         }
     };
+    public type AccountMixed = {
+        #icrc : Ledger.Account;
+        #icp : Blob;
+    };
 
     public type TransactionInput = {
         amount: Nat;
-        to: Ledger.Account;
+        to: AccountMixed;
         from_subaccount : ?Blob;
         memo : ?Blob;
     };
@@ -63,7 +67,14 @@ module {
         let ledger = actor(Principal.toText(ledger_id)) : Ledger.Oneway;
         var getReaderLastUpdate : ?(() -> (Nat64)) = null;
 
-               
+        var retry_id : Nat64 = 0;
+
+         // We will reserve the time used by retry transactions which slipped out of the window
+        public func isTimeReserved(time: Nat64) : Bool {
+          let start = (time / retryWindow) * retryWindow;
+          let end = start + 1_000_000_000;
+          return time >= start and time < end;
+        };       
 
         public func setGetReaderLastUpdate(fn : () -> (Nat64)) {
             getReaderLastUpdate := ?fn;
@@ -106,19 +117,20 @@ module {
                     // Since we are now sending it with a different created_at_time, we need to delete the old one and insert the new one
                     // Or we won't be able to see it in the ledger
                     let old_created_at_time = tx.created_at_time;
-                    var find_idx = 0;
-                    label find_unused_id loop { // Make sure we don't have a collision
-                            tx.created_at_time := created_at_adjusted;
-                            find_idx += 1;
-                            if (find_idx > 100) continue vtransactions;
-                            if (not BTree.has(mem.transactions, Nat64.compare, created_at_adjusted)) {
-                                ignore BTree.insert<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, created_at_adjusted, tx);
-                                ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, old_created_at_time);
-                                break find_unused_id;
-                            } else {
-                                created_at_adjusted += 1;
-                            }
-                    };
+                    created_at_adjusted += retry_id; // we add retry_id to adjust the time and use it for ids. This time is reserved and other transactions cant use it
+                    // Only failed transactions - up to 1000mil a day can.
+                    tx.created_at_time := created_at_adjusted;
+                    retry_id += 1;
+                    if (retry_id > 1_000_000_000) retry_id := 0;
+                    assert(isTimeReserved(created_at_adjusted));
+
+                    if (not BTree.has(mem.transactions, Nat64.compare, created_at_adjusted)) {
+                        ignore BTree.insert<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, created_at_adjusted, tx);
+                        ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, old_created_at_time);
+                    } else {
+                        continue vtransactions;
+                    }
+            
                 };
 
                 try {
@@ -221,9 +233,11 @@ module {
         };
 
         public func send(id:Nat64, tx: TransactionInput) {
+            let #icrc(to) = tx.to else Debug.trap("Can't send to icp legacy addresses from icrc ledger");
+            
             let txr : VM.Transaction = {
                 amount = tx.amount;
-                to = tx.to;
+                to = to;
                 from_subaccount = tx.from_subaccount;
                 var created_at_time = id;
                 memo = switch(tx.memo) {

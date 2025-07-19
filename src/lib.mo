@@ -30,6 +30,9 @@ module {
     /// No other errors are currently possible
     public type SendError = {
         #InsufficientFunds;
+        #InvalidSubaccount;
+        #InvalidMemo;
+        #UnsupportedAccount;
     };
 
     let VM = Mem.Ledger.V1;
@@ -200,6 +203,10 @@ module {
             xmem = lmem.reader;
             ledger_id;
             start_from_block;
+            readingEnabled = func() : Bool {
+                let ?m = lmem.meta else return false;
+                m.minter != null;
+            };
             onError = logErr; // In case a cycle throws an error
             onCycleEnd = func(i : Nat64) { reader_instructions_cost := i }; // returns the instructions the cycle used.
             // It can include multiple calls to onRead
@@ -213,16 +220,18 @@ module {
                         if (mint.to.owner == me_can) {
                             handle_incoming_amount(formatSubaccount(mint.to.subaccount), mint.amount);
 
-                            ignore do ? {
-                                callback_onReceive! (
-                                    {
-                                        mint with
-                                        from = #icrc(getMinter()!); // We can't recieve mint without the ledger having a minter account
-                                        spender = null;
-                                        fee = null;
-                                    } : Transfer
-                                );
+                            let minter_from = Option.get(getMinter(), {owner = Principal.fromText("aaaaa-aa"); subaccount = null});
+                            ignore do ? { 
+                                callback_onReceive!(
+                                {
+                                    mint with
+                                    from = #icrc(minter_from); // We can't recieve mint without the ledger having a minter account
+                                    spender = null;
+                                    fee = null;
+                                } : Transfer
+                            );
                             };
+                            
                         };
                     };
                     if (not Option.isNull(tx.transfer)) {
@@ -337,8 +346,27 @@ module {
         public func send(tr : IcrcSender.TransactionInput) : R<Nat64, SendError> {
             // The amount we send includes the fee. meaning recepient will get the amount - fee
 
+
             // Check if from is the minter, if so we don't need to check balance and track in transit
             let ?m = lmem.meta else trap("ERR104");
+
+            // Verify send to is valid
+            switch(tr.to) {
+                case (#icrc(to)) {
+                    switch(to.subaccount) {
+                        case (?subaccount) {
+                            if (subaccount.size() != 32) return #err(#InvalidSubaccount);
+                            ignore do ? { if (tr.memo!.size() > 32) return #err(#InvalidMemo)};
+                        };
+                        case (null) ();
+                    };
+                };
+                case (#icp(to)) {
+                    return #err(#UnsupportedAccount);
+                    if (to.size() != 32) return #err(#InvalidSubaccount);
+                };
+            };
+
             let is_mint = switch(m.minter) {
                 case (?m) {
                     me_can == m.owner and tr.from_subaccount == m.subaccount
@@ -355,6 +383,12 @@ module {
             };
             
             var created_at_time = (Nat64.fromNat(Int.abs(Time.now()))/1_000_000_000)*1_000_000_000; 
+
+            // We need to make sure we don't use a time that could be used for retry of failed transactions previous day
+            // If we do, we will add 1 second to the time
+            if (icrc_sender.isTimeReserved(created_at_time)) {
+                created_at_time += 1_000_000_000;
+            };
 
             let id = if (lmem.next_tx_id >= created_at_time) {
                     lmem.next_tx_id += 1;
