@@ -11,7 +11,7 @@ module {
             sender = Sender.new();
             accounts = Map.new<Blob, AccountMem>();
             var meta = null;
-            var next_tx_id : Nat64 = 0;
+            var next_tx_id : Nat64 = 100;
         });
 
         public type AccountMem = {
