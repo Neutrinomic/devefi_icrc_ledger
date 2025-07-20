@@ -318,7 +318,6 @@ module {
                 accounts = Map.size(lmem.accounts);
                 pending = icrc_sender.getPendingCount();
                 actor_principal = me_can;
-                sent = lmem.next_tx_id;
                 reader_instructions_cost;
                 sender_instructions_cost;
                 errors = errors.len();
@@ -430,16 +429,20 @@ module {
         };
 
         // Here so we have the same interface as the icp ledger
-        public func registerSubaccount(subaccount: ?Blob) : () {
+        public func registerSubaccount(_subaccount: ?Blob) : () {
             // do nothing
         };
 
-        public func unregisterSubaccount(subaccount: ?Blob) : () {
+        public func unregisterSubaccount(_subaccount: ?Blob) : () {
             // do nothing
         };
 
-        public func isRegisteredSubaccount(subaccount: ?Blob) : Bool {
+        public func isRegisteredSubaccount(_subaccount: ?Blob) : Bool {
             true;
+        };
+
+        public func getRegisteredAccount(_aid: Blob) : ?ICRCLedger.Account {
+            Debug.trap("Shouldn't be called on icrc ledger");
         };
 
         ignore Timer.setTimer<system>(#seconds 0, retrieveMeta);

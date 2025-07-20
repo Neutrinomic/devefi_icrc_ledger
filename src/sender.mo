@@ -41,8 +41,8 @@ module {
 
     let RETRY_EVERY_SEC:Float = 120_000_000_000; // 2 minutes
 
-    let permittedDriftNanos : Nat64 = 60_000_000_000;
-    let transactionWindowNanos : Nat64 = 86400_000_000_000;
+    // let permittedDriftNanos : Nat64 = 60_000_000_000;
+    // let transactionWindowNanos : Nat64 = 86400_000_000_000;
     let retryWindow : Nat64 = 72200_000_000_000;
     let maxReaderLag : Nat64 = 1800_000_000_000; // 30 minutes
     private func adjustTXWINDOW(now:Nat64, time : Nat64) : Nat64 {
