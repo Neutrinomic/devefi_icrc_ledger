@@ -77,7 +77,7 @@ module {
             let now = Time.now();
             if (now - lock < MAX_TIME_LOCKED) return;
             lock := now;
-
+            var reached_end = false;
             // Measure the performance of the cycle
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
@@ -129,10 +129,13 @@ module {
             // Protection against reentrancy - if the last indexed transaction has changed, we unlock and return
             if (query_start != mem.last_indexed_tx) {lock:=0; return;};
 
+            if (rez.transactions.size() < maxTransactionsInCall) reached_end := true;
+            
             // If there are no archived transactions, we can just process the transactions that are inside the ledger and not inside archive
             if (rez.archived_transactions.size() == 0) {
 
-           
+                
+
                 if (rez.transactions.size() != 0) {
                         
                     // Protection against reentrancy and corrupt responses
@@ -141,6 +144,7 @@ module {
                         lock := 0;
                         return;
                     };
+                    
 
                     // We can just process the transactions that are inside the ledger and not inside archive
                     onRead(rez.transactions, mem.last_indexed_tx);
@@ -274,8 +278,8 @@ module {
             let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
             onCycleEnd(inst_end - inst_start);
 
-            // Update the last update time
-            lastUpdate := Nat64.fromNat(Int.abs(Time.now()));
+            // only if we reached the end we update the last update time, so that new retry transactions wont be made if we are lagging behind
+            if (reached_end) lastUpdate := Nat64.fromNat(Int.abs(Time.now()));
 
             // Unlock the cycle
             lock := 0;

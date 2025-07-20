@@ -62,19 +62,13 @@ module {
         getMinter : () -> (?Ledger.Account);
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
         me_can : Principal;
+        genNextSendId : (?Nat64) -> Nat64;
     }) {
         let mem = MU.access(xmem);
         let ledger = actor(Principal.toText(ledger_id)) : Ledger.Oneway;
         var getReaderLastUpdate : ?(() -> (Nat64)) = null;
 
-        var retry_id : Nat64 = 0;
 
-         // We will reserve the time used by retry transactions which slipped out of the window
-        public func isTimeReserved(time: Nat64) : Bool {
-          let start = (time / retryWindow) * retryWindow;
-          let end = start + 1_000_000_000;
-          return time >= start and time < end;
-        };       
 
         public func setGetReaderLastUpdate(fn : () -> (Nat64)) {
             getReaderLastUpdate := ?fn;
@@ -114,15 +108,12 @@ module {
                 
                 var created_at_adjusted = adjustTXWINDOW(nowU64, tx.created_at_time);
                 if (created_at_adjusted != tx.created_at_time) {
-                    // Since we are now sending it with a different created_at_time, we need to delete the old one and insert the new one
-                    // Or we won't be able to see it in the ledger
+                    let new_id = genNextSendId(?created_at_adjusted);
+           
                     let old_created_at_time = tx.created_at_time;
-                    created_at_adjusted += retry_id; // we add retry_id to adjust the time and use it for ids. This time is reserved and other transactions cant use it
-                    // Only failed transactions - up to 1000mil a day can.
+                    created_at_adjusted := new_id; 
                     tx.created_at_time := created_at_adjusted;
-                    retry_id += 1;
-                    if (retry_id > 1_000_000_000) retry_id := 0;
-                    assert(isTimeReserved(created_at_adjusted));
+              
 
                     if (not BTree.has(mem.transactions, Nat64.compare, created_at_adjusted)) {
                         ignore BTree.insert<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, created_at_adjusted, tx);

@@ -118,6 +118,18 @@ module {
             m.minter;
         };
 
+
+        public func genNextSendId(t: ?Nat64) : Nat64 {
+            let created_at_time = (Option.get(t, Nat64.fromNat(Int.abs(Time.now())))/1_000_000_000)*1_000_000_000;
+            
+
+            let id = created_at_time + lmem.next_tx_id;
+            lmem.next_tx_id += 1;
+            if (lmem.next_tx_id >= 1_000_000_000) lmem.next_tx_id := 0;
+            return id;
+        };
+
+
         let icrc_sender = IcrcSender.Sender<system>({
             ledger_id;
             xmem = lmem.sender;
@@ -136,6 +148,7 @@ module {
             getMinter = getMinter;
             onCycleEnd = func(i : Nat64) { sender_instructions_cost := i }; // used to measure how much instructions it takes to send transactions in one cycle
             me_can;
+            genNextSendId;
         });
 
 
@@ -334,11 +347,7 @@ module {
             icrc_reader;
         };
 
-        public func genNextSendId() : Nat64 {
-            let id = lmem.next_tx_id;
-            lmem.next_tx_id += 1;
-            id;
-        };
+
 
         /// Send a transfer from a canister owned address
         /// It's added to a queue and will be sent as soon as possible.
@@ -382,21 +391,7 @@ module {
                 acc.in_transit += tr.amount;   
             };
             
-            var created_at_time = (Nat64.fromNat(Int.abs(Time.now()))/1_000_000_000)*1_000_000_000; 
-
-            // We need to make sure we don't use a time that could be used for retry of failed transactions previous day
-            // If we do, we will add 1 second to the time
-            if (icrc_sender.isTimeReserved(created_at_time)) {
-                created_at_time += 1_000_000_000;
-            };
-
-            let id = if (lmem.next_tx_id >= created_at_time) {
-                    lmem.next_tx_id += 1;
-                    lmem.next_tx_id;
-                } else {
-                    lmem.next_tx_id := created_at_time;
-                    created_at_time;
-                };
+            let id = genNextSendId(null);
     
             icrc_sender.send(id, tr);
             #ok(id);
