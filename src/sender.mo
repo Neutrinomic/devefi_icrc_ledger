@@ -215,9 +215,7 @@ module {
             label tloop for (idx in txs.keys()) { 
                 let tx=txs[idx];
 
-Debug.print("c" # debug_show(tx));
-
-               
+              
                 switch(getTxMemoFrom(tx)) {
                     case (null) {
                         let ?(tx_from, id) = getCreatedAtTime(tx) else continue tloop;

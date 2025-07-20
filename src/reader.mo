@@ -189,7 +189,7 @@ module {
                     // Calling all archive callbacks in parallel
                     for (arg in args.vals()) {
                         // The calls are sent here without awaiting anything
-                        Debug.print("archived_transactions: " # debug_show(arg));
+                        
                         let promise = (with timeout = 20) atx.callback(arg);
                         buf := List.push(promise, buf); 
                     };
