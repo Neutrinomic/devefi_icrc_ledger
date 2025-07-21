@@ -44,7 +44,7 @@ module {
     // let permittedDriftNanos : Nat64 = 60_000_000_000;
     // let transactionWindowNanos : Nat64 = 86400_000_000_000;
     let retryWindow : Nat64 = 72200_000_000_000;
-    let maxReaderLag : Nat64 = 1800_000_000_000; // 30 minutes
+    let maxReaderLag : Nat64 = 20_000_000_000; // 20 seconds
     private func adjustTXWINDOW(now:Nat64, time : Nat64) : Nat64 {
         // If tx is still not sent after the transaction window, we need to
         // set its created_at_time to the current window or it will never be sent no matter how much we retry.
@@ -89,9 +89,10 @@ module {
             let transactions_to_send = BTree.scanLimit<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, 0, ^0, #fwd, 3000);
 
             let ?gr_fn = getReaderLastUpdate else Debug.trap("Err getReaderLastUpdate not set");
+            
             let lastReaderTxTime = gr_fn();  // This is the last time the reader has seen a transaction or the current time if there are no more transactions
 
-            if (lastReaderTxTime != 0 and lastReaderTxTime < nowU64 - maxReaderLag) {
+            if (lastReaderTxTime < nowU64 - maxReaderLag) {
                 onError("Reader is lagging behind by " # Nat64.toText(nowU64 - lastReaderTxTime));
                 return; // Don't attempt to send transactions if the reader is lagging too far behind
             };
@@ -108,6 +109,7 @@ module {
                 
                 var created_at_adjusted = adjustTXWINDOW(nowU64, tx.created_at_time);
                 if (created_at_adjusted != tx.created_at_time) {
+                    
                     let new_id = genNextSendId(?created_at_adjusted);
            
                     let old_created_at_time = tx.created_at_time;
@@ -215,12 +217,12 @@ module {
             label tloop for (idx in txs.keys()) { 
                 let tx=txs[idx];
 
-              
                 switch(getTxMemoFrom(tx)) {
                     case (null) {
                         let ?(tx_from, id) = getCreatedAtTime(tx) else continue tloop;
                         if (tx_from.owner != me_can) continue tloop;
-                
+                             
+
                         ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
                         Vector.add<(Nat64, Nat)>(confirmations, (id, start_id + idx));
                     };
@@ -230,6 +232,7 @@ module {
                     case (?(tx_from, memo)) {
                         if (tx_from.owner != me_can) continue tloop;
                         let ?id = DNat64(Blob.toArray(memo)) else continue tloop;
+              
 
                         ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
                         Vector.add<(Nat64, Nat)>(confirmations, (id, start_id + idx));
