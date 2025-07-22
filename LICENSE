@@ -1,21 +1,40 @@
-MIT License
+NEUTRINOMIC PROPRIETARY LICENSE v1.0  
+All Rights Reserved  
 
-Copyright (c) 2024 <copyright-owner>
+Copyright (c) [2025] Neutrinomic
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software library is the intellectual property of Neutrinomic ("the Licensor") and is protected under applicable copyright laws. **All rights are reserved.**
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## 1. License Grant – Use Only with Neutrinite SNS Neuron
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Permission to **use** this software — without any rights to copy, modify, redistribute, or sublicense — is granted **only** to organizations (including individuals acting on behalf of businesses, DAOs, or services) that meet **all** of the following criteria:
+
+- Hold **at least 100,000 NTN tokens** staked in a **Neutrinite SNS neuron**,  
+- Maintain this neuron staked and active on the Internet Computer blockchain, and  
+- Agree fully to the terms of this license.
+
+This constitutes a **limited, non-exclusive, non-transferable, revocable license** to use the software **internally only**.  
+**No rights to distribute, sublicense, or modify are granted under any circumstances.**
+
+Neutrinomic may adjust the threshold or offer individual licensing exemptions at its sole discretion.
+
+## 2. Prohibited Activities
+
+Unless explicitly licensed in writing by Neutrinomic, **you may not**:
+
+- Copy, modify, fork, translate, or adapt any part of the software,
+- Distribute the software to third parties in any form (source or binary),
+- Incorporate the software into public repositories, protocols, or products,
+- Use the software for educational, personal, or non-commercial purposes,
+- Circumvent the token-based usage requirement.
+
+Any unauthorized use or distribution constitutes a **violation of copyright law** and may result in legal action.
+
+## 3. Ownership and Termination
+
+All rights, title, and interest in the software remain solely with Neutrinomic.  
+This license terminates automatically if the 100,000 NTN neuron condition is no longer met or if any license term is violated.
+
+## 4. No Warranty
+
+This software is provided “AS IS,” without warranty of any kind, express or implied. Use at your own risk.
