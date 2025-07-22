@@ -216,29 +216,12 @@ module {
             let confirmations = Vector.new<(Nat64, Nat)>();
             label tloop for (idx in txs.keys()) { 
                 let tx=txs[idx];
+       
+                let ?(tx_from, id) = getCreatedAtTime(tx) else continue tloop;
+                if (tx_from.owner != me_can) continue tloop;
 
-                switch(getTxMemoFrom(tx)) {
-                    case (null) {
-                        let ?(tx_from, id) = getCreatedAtTime(tx) else continue tloop;
-                        if (tx_from.owner != me_can) continue tloop;
-                             
-
-                        ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
-                        Vector.add<(Nat64, Nat)>(confirmations, (id, start_id + idx));
-                    };
-
-                    // This code has to be removed once everything is upgraded
-                    // Only createdAt identification is used for deduplication
-                    case (?(tx_from, memo)) {
-                        if (tx_from.owner != me_can) continue tloop;
-                        let ?id = DNat64(Blob.toArray(memo)) else continue tloop;
-              
-
-                        ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
-                        Vector.add<(Nat64, Nat)>(confirmations, (id, start_id + idx));
-                    };
-                };
-
+                ignore BTree.delete<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, id);
+                Vector.add<(Nat64, Nat)>(confirmations, (id, start_id + idx));
        
             };
             onConfirmations(Vector.toArray(confirmations));
