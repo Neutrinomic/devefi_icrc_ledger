@@ -282,6 +282,8 @@ module {
 
         icrc_sender.setGetReaderLastUpdate(icrc_reader.getReaderLastUpdate);
 
+        public let sender = icrc_sender;
+
         public func getPendingTransactions() : [IcrcSender.TransactionShared] {
             icrc_sender.getPendingTransactions();
         };
