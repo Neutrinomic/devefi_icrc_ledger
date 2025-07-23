@@ -15,6 +15,7 @@ import Prim "mo:⛔";
 import Nat8 "mo:base/Nat8";
 import Ver1 "./memory/v1";
 import MU "mo:mosup";
+import Iter "mo:base/Iter";
 
 module {
 
@@ -35,6 +36,16 @@ module {
         memo : ?Blob;
     };
 
+
+    public type TransactionShared = {
+        id: {#n64:Nat64; #blob:Blob};
+        amount: Nat;
+        to : AccountMixed;
+        from_subaccount : ?Blob;
+        created_at_time : Nat64; 
+        memo : Blob;
+        tries: Nat;
+    };
 
     let VM = Mem.Sender.V1;
     let MAX_SENT_EACH_CYCLE:Nat = 90;
@@ -263,6 +274,26 @@ module {
                 Nat8.fromNat(Nat64.toNat(value & 255)),
             ];
         };
+
+
+
+        public func getPendingTransactions() : [TransactionShared] {    
+            let transactions = BTree.scanLimit<Nat64, VM.Transaction>(mem.transactions, Nat64.compare, 0, ^0, #fwd, 3000);
+            let transactions_shared = Iter.map<(Nat64, VM.Transaction), TransactionShared>(transactions.results.vals(), func(e : (Nat64, VM.Transaction)) : TransactionShared {
+                {
+                    id = #n64(e.0);
+                    amount = e.1.amount;
+                    to = #icrc(e.1.to);
+                    from_subaccount = e.1.from_subaccount;
+                    created_at_time = e.1.created_at_time;
+                    memo = e.1.memo;
+                    tries = e.1.tries;
+                };
+            });
+            return Iter.toArray(transactions_shared);
+        };
+
+
 
         public func DNat64(array : [Nat8]) : ?Nat64 {
             if (array.size() != 8) return null;

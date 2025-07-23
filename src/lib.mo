@@ -73,6 +73,8 @@ module {
         spender : ?AccountMixed;
     };
 
+    public type TransactionShared = IcrcSender.TransactionShared;
+
     /// The ledger class
     /// start_from_block should be in most cases #last (starts from the last block when first started)
     /// if something went wrong and you need to reinstall the canister
@@ -279,6 +281,10 @@ module {
         });
 
         icrc_sender.setGetReaderLastUpdate(icrc_reader.getReaderLastUpdate);
+
+        public func getPendingTransactions() : [IcrcSender.TransactionShared] {
+            icrc_sender.getPendingTransactions();
+        };
 
         /// Start the ledger timers
 
