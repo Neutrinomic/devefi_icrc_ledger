@@ -291,13 +291,17 @@ module {
         /// Start the ledger timers
 
         private func retrieveMeta() : async () {
+  
             let ledger = actor (Principal.toText(ledger_id)) : ICRCLedger.Self;
+        
             let symbol = await ledger.icrc1_symbol();
+        
             let decimals = await ledger.icrc1_decimals();
             let minter = await ledger.icrc1_minting_account();
             let name = await ledger.icrc1_name();
             let fee = await ledger.icrc1_fee();
             lmem.meta := ?{ symbol; decimals; minter; fee; name };
+        
         };
 
         /// Returns the actor principal
