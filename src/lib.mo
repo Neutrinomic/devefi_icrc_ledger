@@ -96,7 +96,7 @@ module {
         var sender_instructions_cost : Nat64 = 0;
         var reader_instructions_cost : Nat64 = 0;
 
-        var callback_onReceive : ?((Transfer) -> ()) = null;
+        var callback_onReceive : ?(<system>(Transfer) -> ()) = null;
         var callback_onSent : ?((Nat64, Nat) -> ()) = null;
 
         private func trap(e:Text) : None {
@@ -225,7 +225,7 @@ module {
             onError = logErr; // In case a cycle throws an error
             onCycleEnd = func(i : Nat64) { reader_instructions_cost := i }; // returns the instructions the cycle used.
             // It can include multiple calls to onRead
-            onRead = func(transactions : [IcrcReader.Transaction], start_id:Nat) {
+            onRead = func<system>(transactions : [IcrcReader.Transaction], start_id:Nat) {
                 icrc_sender.confirm(transactions, start_id);
 
 
@@ -237,7 +237,7 @@ module {
 
                             let minter_from = Option.get(getMinter(), {owner = Principal.fromText("aaaaa-aa"); subaccount = null});
                             ignore do ? { 
-                                callback_onReceive!(
+                                callback_onReceive!<system>(
                                 {
                                     mint with
                                     from = #icrc(minter_from); // We can't recieve mint without the ledger having a minter account
@@ -257,7 +257,7 @@ module {
                                 // ignore it since we can't even burn that
                                 handle_incoming_amount(formatSubaccount(tr.to.subaccount), tr.amount);
                                 ignore do ? {
-                                    callback_onReceive! ({
+                                    callback_onReceive!<system>({
                                         tr with
                                         from = #icrc(tr.from);
                                         spender = do ? { #icrc(tr.spender!) };
@@ -423,7 +423,7 @@ module {
         };
 
         /// Called when a received transaction is confirmed. Only one function can be set. (except dust < fee)
-        public func onReceive(fn : (Transfer) -> ()) : () {
+        public func onReceive(fn : <system>(Transfer) -> ()) : () {
             assert (Option.isNull(callback_onReceive));
             callback_onReceive := ?fn;
         };

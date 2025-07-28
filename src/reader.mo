@@ -36,7 +36,7 @@ module {
         start_from_block: {#id:Nat; #last};
         onError : (Text) -> (); // If error occurs during following and processing it will return the error
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
-        onRead : ([Ledger.Transaction], Nat) -> ();
+        onRead : <system>([Ledger.Transaction], Nat) -> ();
         maxSimultaneousRequests : Nat;
         readingEnabled : () -> Bool;
     }) {
@@ -144,7 +144,7 @@ module {
                     
 
                     // We can just process the transactions that are inside the ledger and not inside archive
-                    onRead(rez.transactions, mem.last_indexed_tx);
+                    onRead<system>(rez.transactions, mem.last_indexed_tx);
 
                     // We update the last indexed transaction
                     mem.last_indexed_tx += rez.transactions.size();
@@ -242,7 +242,7 @@ module {
                     };
 
                     // Send the transactions to the onRead callback
-                    onRead(u.transactions, mem.last_indexed_tx);
+                    onRead<system>(u.transactions, mem.last_indexed_tx);
 
                     // Update the last indexed transaction
                     mem.last_indexed_tx += u.transactions.size();
@@ -261,7 +261,7 @@ module {
                     };
 
                     // Send the transactions to the onRead callback
-                    onRead(rez.transactions, mem.last_indexed_tx);
+                    onRead<system>(rez.transactions, mem.last_indexed_tx);
 
                     // Update the last indexed transaction
                     mem.last_indexed_tx += rez.transactions.size();
