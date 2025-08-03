@@ -39,10 +39,12 @@ module {
         onRead : <system>([Ledger.Transaction], Nat) -> ();
         maxSimultaneousRequests : Nat;
         readingEnabled : () -> Bool;
+        CYCLE_RECURRING_TIME_SEC : Nat;
     }) {
         let mem = MU.access(xmem);
         let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
-
+        public var optQueueSender : ?(<system>() -> async* ()) = null;
+        
         // Last transaction time and last update time will reset on upgrade
         var lastTxTime : Nat64 = 0;
         var lastUpdate : Nat64 = 0;
@@ -52,7 +54,6 @@ module {
         var lock:Int = 0;
         let MAX_TIME_LOCKED:Int = 120_000_000_000; // 120 seconds
 
-        let CYCLE_RECURRING_TIME_SEC = 2;
         
         /// Called every CYCLE_RECURRING_TIME_SEC seconds
         /// Reads transactions from ledger and archives and sends them to onRead callback
@@ -274,12 +275,15 @@ module {
             // Measure the performance of the cycle
             let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
             onCycleEnd(inst_end - inst_start);
-
-            // only if we reached the end we update the last update time, so that new retry transactions wont be made if we are lagging behind
-            if (mem.last_indexed_tx == rez.log_length) lastUpdate := Nat64.fromNat(Int.abs(Time.now()));
-               
             // Unlock the cycle
             lock := 0;
+            // only if we reached the end we update the last update time, so that new retry transactions wont be made if we are lagging behind
+            if (mem.last_indexed_tx == rez.log_length) {
+                lastUpdate := Nat64.fromNat(Int.abs(Time.now()));
+                ignore do ? { await* optQueueSender!<system>(); };
+            };
+               
+            
         };
 
         /// Returns the last tx time or the current time if there are no more transactions to read

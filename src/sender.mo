@@ -309,7 +309,13 @@ module {
             return ?(Nat64.fromNat(Nat8.toNat(array[0])) << 56 | Nat64.fromNat(Nat8.toNat(array[1])) << 48 | Nat64.fromNat(Nat8.toNat(array[2])) << 40 | Nat64.fromNat(Nat8.toNat(array[3])) << 32 | Nat64.fromNat(Nat8.toNat(array[4])) << 24 | Nat64.fromNat(Nat8.toNat(array[5])) << 16 | Nat64.fromNat(Nat8.toNat(array[6])) << 8 | Nat64.fromNat(Nat8.toNat(array[7])));
         };
 
-        ignore Timer.recurringTimer<system>(#seconds 2, cycle);
+        public func optQueueSend() : async* () {
+            if (BTree.size(mem.transactions) > 0) {
+                await cycle();
+            };
+        };
+
+        
     };
 
 };

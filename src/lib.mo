@@ -14,9 +14,11 @@ import SWB "mo:swb";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Ver1 "./memory/v1";
+import Ver2 "./memory/v2";
 import MU "mo:mosup";
 import Int "mo:base/Int";
 import Time "mo:base/Time";
+import Nat8 "mo:base/Nat8";
 
 module {
     type R<A, B> = Result.Result<A, B>;
@@ -24,6 +26,7 @@ module {
     public module Mem {
         public module Ledger {
             public let V1 = Ver1.Ledger;
+            public let V2 = Ver2.Ledger;
         };
     };
 
@@ -35,7 +38,7 @@ module {
         #UnsupportedAccount;
     };
 
-    let VM = Mem.Ledger.V1;
+    let VM = Mem.Ledger.V2;
 
     public type Meta = VM.Meta;
 
@@ -75,6 +78,13 @@ module {
 
     public type TransactionShared = IcrcSender.TransactionShared;
 
+    public type Settings = {
+        CYCLE_RECURRING_TIME_SEC : Nat;
+        START_FROM_BLOCK : { #id : Nat; #last };
+        ME_CAN : Principal;
+        LEDGER_ID: Principal;
+    };
+
     /// The ledger class
     /// start_from_block should be in most cases #last (starts from the last block when first started)
     /// if something went wrong and you need to reinstall the canister
@@ -88,9 +98,10 @@ module {
     ///     stable let lmem = L.LMem();
     ///     let ledger = L.Ledger(lmem, "bnz7o-iuaaa-aaaaa-qaaaa-cai", #last);
     /// ```
-    public class Ledger<system>(xmem : MU.MemShell<VM.Mem>, ledger_id_txt : Text, start_from_block : ({ #id : Nat; #last }), me_can : Principal) {
+    public class Ledger<system>(xmem : MU.MemShell<VM.Mem>, settings: Settings) { // ledger_id_txt : Text, start_from_block : ({ #id : Nat; #last }), me_can : Principal
+        let me_can = settings.ME_CAN;
         let lmem = MU.access(xmem);
-        let ledger_id = Principal.fromText(ledger_id_txt);
+        let ledger_id = settings.LEDGER_ID;
         let errors = SWB.SlidingWindowBuffer<Text>();
 
         var sender_instructions_cost : Nat64 = 0;
@@ -149,7 +160,7 @@ module {
             };
             getMinter = getMinter;
             onCycleEnd = func(i : Nat64) { sender_instructions_cost := i }; // used to measure how much instructions it takes to send transactions in one cycle
-            me_can;
+            me_can = settings.ME_CAN;
             genNextSendId;
         });
 
@@ -214,10 +225,11 @@ module {
 
         // Reader
         let icrc_reader = IcrcReader.Reader<system>({
+            CYCLE_RECURRING_TIME_SEC = settings.CYCLE_RECURRING_TIME_SEC;
             maxSimultaneousRequests = 20;
             xmem = lmem.reader;
             ledger_id;
-            start_from_block;
+            start_from_block = settings.START_FROM_BLOCK;
             readingEnabled = func() : Bool {
                 let ?m = lmem.meta else return false;
                 m.minter != null;
@@ -279,6 +291,7 @@ module {
                 };
             };
         });
+        icrc_reader.optQueueSender := ?(icrc_sender.optQueueSend);
 
         icrc_sender.setGetReaderLastUpdate(icrc_reader.getReaderLastUpdate);
 
@@ -293,14 +306,44 @@ module {
         private func retrieveMeta() : async () {
   
             let ledger = actor (Principal.toText(ledger_id)) : ICRCLedger.Self;
-        
-            let symbol = await ledger.icrc1_symbol();
-        
-            let decimals = await ledger.icrc1_decimals();
             let minter = await ledger.icrc1_minting_account();
-            let name = await ledger.icrc1_name();
-            let fee = await ledger.icrc1_fee();
-            lmem.meta := ?{ symbol; decimals; minter; fee; name };
+            let meta = await ledger.icrc1_metadata();
+
+            var symbol :?Text = null;
+            var decimals : ?Nat = null;
+            var name :?Text = null;
+            var fee :?Nat = null;
+            var max_memo :?Nat = null;
+
+            for (m in meta.vals()) {
+                if (m.0 == "icrc1:decimals") {
+                    let #Nat(d) = m.1 else Debug.trap("invalid decimals");
+                    decimals := ?d;
+                };
+                if (m.0 == "icrc1:symbol") {
+                    let #Text(s) = m.1 else Debug.trap("invalid symbol");
+                    symbol := ?s;
+                };
+                if (m.0 == "icrc1:name") {
+                    let #Text(n) = m.1 else Debug.trap("invalid name");
+                    name := ?n;
+                };
+                if (m.0 == "icrc1:fee") {
+                    let #Nat(f) = m.1 else Debug.trap("invalid fee");
+                    fee := ?f;
+                };
+                if (m.0 == "icrc1:max_memo_length") {
+                    switch(m.1) {
+                        case (#Nat(m)) {
+                            max_memo := ?m;
+                        };
+                        case (_) ();
+                    };
+                };
+                max_memo := ?Option.get(max_memo, 32);
+            };
+
+            lmem.meta := do ? { {symbol = symbol!; decimals = Nat8.fromNat(decimals!); minter; fee = fee!; name = name!; max_memo = max_memo! }};
         
         };
 
@@ -376,7 +419,7 @@ module {
                     switch(to.subaccount) {
                         case (?subaccount) {
                             if (subaccount.size() != 32) return #err(#InvalidSubaccount);
-                            ignore do ? { if (tr.memo!.size() > 32) return #err(#InvalidMemo)};
+                            ignore do ? { if (tr.memo!.size() > m.max_memo) return #err(#InvalidMemo)};
                         };
                         case (null) ();
                     };
