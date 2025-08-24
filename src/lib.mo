@@ -15,6 +15,7 @@ import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Ver1 "./memory/v1";
 import Ver2 "./memory/v2";
+import Ver3 "./memory/v3";
 import MU "mo:mosup";
 import Int "mo:base/Int";
 import Time "mo:base/Time";
@@ -27,6 +28,7 @@ module {
         public module Ledger {
             public let V1 = Ver1.Ledger;
             public let V2 = Ver2.Ledger;
+            public let V3 = Ver3.Ledger;
         };
     };
 
@@ -38,7 +40,7 @@ module {
         #UnsupportedAccount;
     };
 
-    let VM = Mem.Ledger.V2;
+    let VM = Mem.Ledger.V3;
 
     public type Meta = VM.Meta;
 
@@ -244,6 +246,7 @@ module {
                 label txloop for (tx in transactions.vals()) {
                     if (not Option.isNull(tx.mint)) {
                         let ?mint = tx.mint else continue txloop;
+                        lmem.observed_mint += mint.amount;
                         if (mint.to.owner == me_can) {
                             handle_incoming_amount(formatSubaccount(mint.to.subaccount), mint.amount);
 
@@ -264,6 +267,7 @@ module {
                     if (not Option.isNull(tx.transfer)) {
                         let ?tr = tx.transfer else continue txloop;
                         let ?fee = tr.fee else continue txloop;
+                        lmem.observed_transfer_fees += fee;
                         if (tr.to.owner == me_can) {
                             if (tr.amount >= fee) {
                                 // ignore it since we can't even burn that
@@ -284,10 +288,29 @@ module {
                     };
                     if (not Option.isNull(tx.burn)) {
                         let ?burn = tx.burn else continue txloop;
+                        lmem.observed_burn += burn.amount;
                         if (burn.from.owner == me_can) {
                             handle_outgoing_amount(formatSubaccount(burn.from.subaccount), burn.amount);
                         };
+                        ignore do ? {
+                            let minter = getMinter()!;
+                            if (minter.owner == me_can) {
+                                callback_onReceive!<system>({
+                                    amount = burn.amount;
+                                    created_at_time = null;
+                                    memo = burn.memo;
+                                    fee = ?0;
+                                    from = #icrc(burn.from);
+                                    to = minter;
+                                    spender = null;
+                                } : Transfer);
+                            };
+                        }
                     };
+
+                    if (Option.isNull(tx.mint) and Option.isNull(tx.burn) and Option.isNull(tx.transfer)) {
+                        ignore do ? { lmem.observed_other_tx_fees += lmem.meta!.fee }
+                    }
                 };
             };
         });
@@ -364,7 +387,25 @@ module {
             );
         };
 
-   
+        public type Observed = {
+            transfer_fees : Nat;
+            mint : Nat;
+            burn : Nat;
+            other_tx_fees : Nat;
+        };
+
+        /// Returns the observed amounts since start. Careful - starting with #last instead of #id(0) will not give you all
+        /// transfer_fees - total fees observed from transfers
+        /// mint - total amount minted
+        /// burn - total amount burned
+        public func getObserved() : Observed {
+            {
+                transfer_fees = lmem.observed_transfer_fees;
+                mint = lmem.observed_mint;
+                burn = lmem.observed_burn;
+                other_tx_fees = lmem.observed_other_tx_fees;
+            }
+        };
 
         /// Returns info about ledger library
         public func getInfo() : Info {
